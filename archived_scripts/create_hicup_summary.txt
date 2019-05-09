@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+header="File\tTotal_Reads_1\tTotal_Reads_2\tNot_Truncated_Reads_1\tNot_Truncated_Reads_2\tTruncated_Read_1\tTruncated_Read_2\tAverage_Length_Truncated_1\tAverage_Length_Truncated_2\tToo_Short_To_Map_Read_1\tToo_Short_To_Map_Read_2\tUnique_Alignments_Read_1\tUnique_Alignments_Read_2\tMultiple_Alignments_Read_1\tMultiple_Alignments_Read_2\tFailed_To_Align_Read_1\tFailed_To_Align_Read_2\tPaired_Read_1\tPaired_Read_2\tValid_Pairs\tInvalid_Pairs\tSame_Circularised\tSame_Dangling_Ends\tSame_Fragment_Internal\tRe_Ligation\tContiguous_Sequence\tWrong_Size\tDeduplication_Read_Pairs_Uniques\tDeduplication_Cis_Close_Uniques\tDeduplication_Cis_Far_Uniques\tDeduplication_Trans_Uniques\tPercentage_Mapped\tPercentage_Valid\tPercentage_Uniques\tPercentage_Unique_Trans\tPercentage_Ditags_Passed_Through_HiCUP"
+
+awk 'FNR==1 && NR!=1 {next;} {print}' hicup_truncater_summary_*\.txt | tail -n +2 | sort -k 1 | awk -v OFS='\t' 'FNR % 2 == 1 {split($1, file, "."); base_name=file[1] ; total=$2 ; trunc=$3 ; not_trunc=$5 ; trunc_length=$7 ; next } { print base_name".hicup.bam", total, $2, not_trunc, $5, trunc, $3, trunc_length, $7 > "truncate_temp.txt"}' 
+
+awk 'FNR==1 && NR!=1 {next;} {print}' hicup_mapper_summary_*\.txt | tail -n +2 | sort -k 1 | awk -v OFS='\t' 'FNR % 2 == 1 {short=$3 ; unique=$5 ; multi=$7 ; fail=$9 ; paired=$11 ; next } { print short, $3, unique, $5, multi, $7, fail, $9, paired, $11 > "mapper_temp.txt"} {printf "%.2f\n",100*$11/$2 > "mapper_temp_percent.txt"}' 
+
+awk 'FNR==1 && NR!=1 {next;} {print}' hicup_filter_summary_*\.txt | tail -n +2 | sort -k 1 | awk -v OFS='\t' '{print $3, $7, $8, $9, $10, $11, $12, $13 > "filter_temp.txt"} {printf "%.2f\n",100*$3/$2   > "filter_temp_percent.txt"}'
+
+awk 'FNR==1 && NR!=1 {next;} {print}' hicup_deduplicator_summary_*\.txt | tail -n +2 | sort -k 1 | awk -v OFS='\t' '{print $3, $4, $5, $6 > "dedup_temp.txt"} {printf "%.2f\t%.2f\n",100*$3/$2,100*$6/$2 > "dedup_temp_percent.txt"}'
+
+paste truncate_temp.txt mapper_temp.txt filter_temp.txt dedup_temp.txt mapper_temp_percent.txt filter_temp_percent.txt dedup_temp_percent.txt |
+	awk -v OFS='\t' '{printf "%s\t%.2f\n",$0,100*$28/$2}' | cat <(echo -e ${header}) - > HiCUP_summary_report.txt
+
+rm truncate_temp.txt mapper_temp.txt mapper_temp_percent.txt filter_temp.txt filter_temp_percent.txt dedup_temp.txt dedup_temp_percent.txt

@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=hicup_deduplicator_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_deduplicator_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_deduplicator_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-12:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+# Define hicup_deduplicator path
+hicup_deduplicator="/home/u/sr467/scripts/HiCUP-master/hicup_deduplicator"
+
+# Out directory defined by first parameter
+outdir="${1}"
+shift
+
+# Files to deduplicate are provided as command line argument.
+bams="${@}"
+
+mpirun ${hicup_deduplicator} --zip --outdir ${outdir} --threads ${SLURM_CPUS_PER_TASK} ${bams[*]}
+
+for bam in "${@}"; do
+  sample=${bam%\.filt\.bam}
+  sample_nopath=${sample##*/}
+  mpirun samtools sort -n -m 3G -l 0 -@ ${SLURM_CPUS_PER_TASK} ${outdir}/${sample_nopath}.dedup.bam |
+    samtools fixmate -@ ${SLURM_CPUS_PER_TASK} - ${outdir}/${sample_nopath}.fix.dedup.bam
+done
+
+sbatch /home/u/sr467/scripts/SNPsplit_slurm.txt ~/scratch/projects/HiC/all_samples/vcfs/HB2_CL4_MWER_solution_snpsplit.txt ~/scratch/projects/HiC/masked_analysis/ ~/scratch/projects/HiC/masked_analysis/HB2_CL4*fix.dedup.bam
+sbatch /home/u/sr467/scripts/SNPsplit_slurm.txt ~/scratch/projects/HiC/all_samples/vcfs/HB2_WT_MWER_solution_snpsplit.txt ~/scratch/projects/HiC/masked_analysis/ ~/scratch/projects/HiC/masked_analysis/HB2_WT*fix.dedup.bam
+sbatch /home/u/sr467/scripts/SNPsplit_slurm.txt ~/scratch/projects/HiC/all_samples/vcfs/MCF7_MWER_solution_snpsplit.txt ~/scratch/projects/HiC/masked_analysis/ ~/scratch/projects/HiC/masked_analysis/MCF7*fix.dedup.bam
+

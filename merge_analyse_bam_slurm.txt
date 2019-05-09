@@ -1,0 +1,49 @@
+#!/bin/bash
+
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=process_bam_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/process_bam_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/process_bam_%j.err
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples_masked_2/
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=06:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+# Define cores
+threads=${SLURM_CPUS_PER_TASK}
+
+# Define sample name to prefix BAM
+sample="${1}"
+
+# All other positional arguments are alignment files to process
+shift
+
+# Merge reads - retain mapped reads above defined quality, run fixmate, remove unpaired (where mate was previously filtered) and remove unmapped.
+#mpirun samtools merge -n -@ ${threads} ${sample}.merged.bam "${@}"
+mpirun samtools fixmate -pm -@ ${threads} ${sample}.merged.bam - \
+   | samtools sort -m 1G -l 0 -@ ${threads} - \
+   | samtools markdup -sr -@ ${threads} - - 2> ${sample}.markdup.txt \
+   | samtools view -F 12 -q 15 -u -@ ${threads} \
+   | samtools sort -n -m 1G -l 0 - \
+   | samtools fixmate -p -@ ${threads} - - \
+   | samtools view -f 1 -b -@ ${threads} > ${sample}.name_sorted.bam
+
+mpirun samtools sort -m 3G -@ ${threads} ${sample}.name_sorted.bam > ${sample}.coord_sorted.bam
+
+mpirun samtools index ${sample}.coord_sorted.bam
+
+mpirun samtools idxstats ${sample}.coord_sorted.bam > ${sample}.idxstats.txt &
+	samtools flagstat ${sample}.coord_sorted.bam > ${sample}.flagstat.txt &
+	samtools stats ${sample}.coord_sorted.bam > ${sample}.stats.txt
+
+#rm ${sample}.fix.coord_sorted.bam ${sample}.fix.bam
+# rm ${samples[*]}
+

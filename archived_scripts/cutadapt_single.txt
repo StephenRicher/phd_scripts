@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+adapter="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+error_rate="0.1"
+min_overlap="1"
+gc="42"
+min_length="20"
+min_qual="20"
+threads="12"
+
+fastq_screen --aligner bowtie2 --threads ${threads} *\.f*q\.gz
+fastqc --threads ${threads} *\.f*q\.gz
+
+while IFS=  read -r -d $'\0'; do
+	sample=${REPLY%\.f*q*}; sample=${sample##*/}
+	cutadapt --adapter ${adapter} \
+             --cores 0 \
+             --error-rate ${error_rate} \
+             --overlap ${min_overlap} \
+             --gc-content ${gc} \
+             --minimum-length ${min_length} \
+             --quality-cutoff ${min_qual} \
+             ${REPLY} \
+             2> ${sample}_cutadapt.txt | gzip > ${sample}_trim.fq.gz
+done < <(find $(pwd) -type f -name "*\.f*q\.gz" -and ! -name "*trim.fq.gz" -print0)
+
+fastqc --threads ${threads} *_trim.fq.gz*
+
+while IFS=  read -r -d $'\0'; do
+	sample=${REPLY%.fq.gz}
+	bowtie2 -x ${bt2_index} -U ${REPLY} -p ${threads} --very-sensitive 2> ${sample}_bowtie2.txt |
+	samtools sort -@ ${threads} -o ${sample}.sorted.bam
+done < <(find $(pwd) -type f -name "*trim\.fq\gz" -print0)

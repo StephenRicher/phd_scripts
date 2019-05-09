@@ -1,0 +1,48 @@
+#!/bin/bash
+
+#SBATCH --account=ba-fs6sdb
+#SBATCH --array=1-4
+#SBATCH --job-name=bowtie2_align_%A_%a
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/bowtie2_align_%A_%a.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/bowtie2_align_%A_%a.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=06:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples_masked_2/
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+module load bowtie2
+
+# Bowtie2 index is first argument.
+bt2_index="${1}"
+
+# All other arguments are files to process.
+shift
+
+# Variable indirection
+fastq="${!SLURM_ARRAY_TASK_ID}"
+
+# Extract sample name from file name.
+fastq_nopath=${fastq##*/}
+sample=${fastq_nopath%%.*}
+
+# Define cores
+threads=${SLURM_CPUS_PER_TASK}
+
+if [[ ${fastq} == *"R1"* ]]; then
+	flag="0x40"
+else
+	flag="0x80"
+fi
+
+# Files saved to current working directory 	
+mpirun bowtie2 -x ${bt2_index} -U ${fastq} -p ${threads} --sensitive 2>> ${sample}_bt2_alignment_stats.txt | 
+	awk -v OFS='\t' -v flag=${flag} '!/^ *@/ && flag == "0x40" {$2 = $2+0x40} !/^ *@/ && flag == "0x80" {$2 = $2+0x80} {print}' |
+	samtools sort -n -O bam -m 3G -@ ${threads} > ${fastq_nopath%.*}.sorted.bam
+	

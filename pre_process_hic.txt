@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# General parameters
+qc_directory="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/qc_logs/"
+threads="6"
+
+# Define paths to relevant bash scripts
+remove_wrapping="/home/stephen/h/phd/scripts2/remove_fasta_wrapping.sh"
+validate_fasta="/home/stephen/h/phd/scripts2/validate_fasta.sh"
+digest_genome="/home/stephen/h/phd/scripts2/digest_genome.sh"
+truncate_reads="/home/stephen/h/phd/scripts2/hic_truncater.sh"
+split_fastq="/home/stephen/h/phd/scripts2/split_fastq.sh"
+
+# Raw sequence directory
+raw_dir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/"
+
+# Reference genome download parameters
+genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+
+# Bowtie2 index parameters
+bt2_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/bt2_index/"
+bt2_basename="GRCh38_primary_assembly"
+
+# Reference genome digest parameters
+digest_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/digest/"
+digest_prefix="${bt2_basename}"
+re_name="Mbo1"
+re_recognition="^GATC"
+
+# Cutadapt parameters
+forward_adapter="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+reverse_adapter="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+error_rate="0.1"
+min_overlap="1"
+gc="46"
+min_length="20"
+min_qual="20"
+
+# Split FASTQ file parameters
+reads_per_file="10000000"
+split_fastq_outdir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/split_reads/"
+
+# Download GRCh38 primary assembly and remove any FASTA line wrapping.
+#curl "${genome_url}" | gunzip | "${remove_wrapping}" | gzip > "${genome_dir}"
+
+# Ensure FASTA is in valid format and generate Mbo1 digest and Bowtie2 index.
+#if "${validate_fasta}" "${genome_dir}"; then
+#  "${digest_genome}" "${re_recognition}" "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
+#  bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
+#  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_directory%*/}"/"${bt2_basename}".bt2_index_summary.txt
+#fi
+
+#fastqc --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].*f*q*
+
+#fastq_screen --aligner bowtie2 --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].*f*q*
+
+for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
+  break
+  cutadapt -a ${forward_adapter} -A ${reverse_adapter} \
+           --error-rate ${error_rate} --overlap ${min_overlap} \
+           --gc-content ${gc} --minimum-length ${min_length} \
+           --quality-cutoff ${min_qual} --cores "${threads}" \
+           --output "${raw_dir%*/}"/${sample}-R1.trim.fq.gz --paired-output "${raw_dir%*/}"/${sample}-R4.trim.fq.gz \
+           "${raw_dir%*/}"/${sample}-R1.f*q.gz "${raw_dir%*/}"/${sample}-R4.f*q.gz > "${qc_directory%*/}"/${sample}.cutadapt.txt
+done
+
+#fastqc --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].trim.fq.gz
+
+while IFS=  read -r -d $'\0' trimmed_fastq; do
+  sample="${trimmed_fastq##*/}"; sample="${sample%*.fq.gz}"
+  "${truncate_reads}" "${re_recognition}" "${trimmed_fastq}" 2> "${qc_directory%*/}"/"${sample}".trunc_summary.txt \
+    | gzip > "${raw_dir%*/}"/"${sample}".trunc.fq.gz &
+done < <(find "${raw_dir}" -type f -name "*.trim.fq.gz" -print0)
+wait
+
+"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_outdir}" -t "${threads}" "${raw_dir%*/}"/*.trunc.fq.gz
+

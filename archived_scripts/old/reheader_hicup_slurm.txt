@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=reheader_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/reheader_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/reheader_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=1:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/hicup/
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+mpirun /home/u/sr467/scripts/reheader.txt

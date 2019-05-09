@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+for BAM in *.dedup.bam; do
+{
+  samtools view -H ${BAM} | 
+  sed "s/HiCUP Deduplicator/ID:HiCUP Deduplicator/" | 
+  samtools reheader - ${BAM} > ${BAM}.temp.bam
+  mv ${BAM}.temp.bam ${BAM}
+} &
+done; wait

@@ -1,0 +1,31 @@
+
+# Specify genome location
+genome=${1}
+shift
+
+# Specify restriction site and enzyme name.
+enzyme="MboI"; restriction_site="GATC"
+
+# Specify list of capture regions to process
+capture_regions="/home/stephen/h/phd/scripts2/capture_regions.bed"
+
+# If digest file does not exist then create one.
+if [ ! -f ${genome%.*}_${enzyme}_rest_site.bed ]; then
+    findRestSite --fasta <(zcat -f ${genome}) \
+                 --searchPattern ${restriction_site} \
+                 --outFile ${genome%.*}_${enzyme}_rest_site.bed
+fi
+
+count=0
+for file in "${@}"; do
+	((count++))
+	/home/stephen/h/phd/scripts2/hicup_to_hicexplorer.txt -f ${file} -c ${capture_regions} -d ${genome%.*}_${enzyme}_rest_site.bed
+	
+	# Combine all summary files. If first in loop then include header. 
+	if [ "${count}" -eq "1" ]; then
+		cp ${file%%.*}-summary.txt all_samples_summary.txt
+	else
+		tail -n +2 ${file%%.*}-summary.txt >> all_samples_summary.txt
+	fi
+done
+

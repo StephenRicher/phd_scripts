@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --account=free
+#SBATCH --array=1-1
+#SBATCH --job-name=extract_snp_%A_%a
+#SBATCH --output=extract_snp_%A_%a.out
+#SBATCH --error=extract_snp_%A_%a.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-06:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/hicup_balena/snp_masked/
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+# Define location of file containing regions.
+regions="/home/u/sr467/scratch/projects/HiC/slurms/hicup_slurms/regions.txt"
+
+# Read a particular region line from file and into an array. Define variables.
+region_line=$(head -${SLURM_ARRAY_TASK_ID} ${regions} | tail -1)
+region_array=($region_line)
+region=${region_array[0]} chr=${region_array[1]} start=${region_array[2]} end=${region_array[3]}
+
+# Define location of SNP bed file
+snp="/home/u/sr467/scratch/projects/genomes/GRCh38/snp/snp_sites.bed"
+
+# Safely read file names into array using null character as seperator.
+bams=()
+while IFS=  read -r -d $'\0'; do
+    bams+=("$REPLY")
+done < <(find . -type f -name "*\.dedup.bam" -print0)
+
+mpirun /home/u/sr467/scratch/projects/HiC/slurms/hicup_slurms/extract_snp_overlap.sh ${snp} ${region} ${chr} ${start} ${end} ${genome} "${bams[@]}"
+

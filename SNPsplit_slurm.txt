@@ -1,0 +1,44 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=snp_split_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/snp_split_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/snp_split_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-06:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+shopt -s extglob
+
+# Digest file is first argument. All other arguments are files to process.
+snp_file=${1}
+
+# Out directory is second argument.
+outdir="${2}"
+
+# All other arguments are files to filter
+shift 2
+
+shopt -s extglob
+
+mpirun /home/u/sr467/scripts/SNPsplit.pl --hic --snp_file ${snp_file} -o ${outdir} "${@}"
+
+for file in "${@}"; do
+  
+  # Extract sample and replicate based on naming convention: sample-replicate.ext
+  name=${file##*/}; name=${name%%.*}
+  sample=$(tr '-' '\n' <<<${name} | head -n 1)
+  replicate_num=$(tr '-' '\n' <<<${name} | head -n 2 | tail -n 1)
+  mpirun samtools merge -n -@ ${SLURM_CPUS_PER_TASK} ${sample}_G1-${replicate_num}.bam ${file%.*}.G1_!(G2).bam
+  mpirun samtools merge -n -@ ${SLURM_CPUS_PER_TASK} ${sample}_G2-${replicate_num}.bam ${file%.*}.G2_!(G1).bam
+
+done
+
+

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+seed=50
+nreads=1000000
+threads=12
+outdir="sampled"
+mkdir ${outdir}
+
+parallel -d ' ' -j ${threads} -n 1 "seqtk sample -s ${seed} {} ${nreads} | gzip > ${outdir}/'{= s:\.[^.]+$::;s:\.[^.]+$::; =}'_sample.fq.gz" ::: "${@}"

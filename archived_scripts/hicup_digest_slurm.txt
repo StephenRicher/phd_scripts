@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=hicup_digest_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_digest_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_digest_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=0-00:15:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load hicup/0.7.1
+module load samtools/1.9
+
+# Specify path to genome(s) to be digested
+genome=$1
+
+# Specify genome name
+name=$2
+
+# Digest genome and output to same directory as genome
+mpirun hicup_digester --genome ${name} --re1 ^GATC,MboI --zip --outdir ${genome%/*} ${genome}
+

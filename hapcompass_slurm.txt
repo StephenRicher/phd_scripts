@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+#SBATCH --account=free
+#SBATCH --array=1-3
+#SBATCH --job-name=hapcompass_%A_%a
+#SBATCH --output=hapcompass_%A_%a.out
+#SBATCH --error=hapcompass_%A_%a.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=06:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/hicup_balena
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load java/jdk/1.8.0 
+
+# Safely read file names into array using null character as seperator.
+bams=()
+while IFS=  read -r -d $'\0'; do
+	bams+=("$REPLY")
+done < <(find $(pwd) -type f -name "*\.coord_sorted\.bam" -print0)
+
+# Define path to hapcompass
+hapcompass="/home/u/sr467/scripts/hapcompass_v0.8.2/hapcompass.jar"
+
+# Define path to hapcompass to vcf converter
+hc2vcf="/home/u/sr467/scripts/hapcompass_v0.8.2/hc2vcf.jar"
+
+# Use 1 array per bam file
+bam=${bams[$((${SLURM_ARRAY_TASK_ID}-1))]}
+
+sample=${bam%.coord_sorted.bam}
+mpirun java -Xmx50g -jar ${hapcompass} --bam ${sample}.coord_sorted.bam --vcf ${sample}.vcf --output ${sample}_hapcompass &&
+	java -jar ${hc2vcf} ${sample}_hapcompass_MWER_solution.txt ${sample}.vcf 2 true
+mpirun awk -v OFS=$'\t' 'substr($10,1,3)=="0|1" {print $3, $1, $2, 1, $4"/"$5} substr($10,1,3)=="1|0" {print $3, $1, $2, 1, $5"/"$4}' ${sample}_hapcompass_MWER_solution.txt.vcf > ${sample}_snpsplit.txt
+

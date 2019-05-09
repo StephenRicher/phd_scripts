@@ -1,0 +1,26 @@
+
+file="HB2_WT_1_GNG12_AS1_DIRAS3_3000_norm_correct.txt.tsv"
+
+cut -f 1-3 "${file}" | sort -u -t $'\t' | cat -n > ${file%.*}_numbered_region.txt
+
+cp ${file} ${file%.*}_tadtool.bed
+while read -r n k; do
+   sed -i "s/${k}/${n}/g" ${file%.*}_tadtool.bed
+done < ${file%.*}_numbered_region.txt
+# Remove trailing whitespace
+sed -i 's/[ \t]*$//' ${file%.*}_tadtool.bed
+
+
+awk -v OFS='\t' '{first = $1; $1=""; print $0, first}' ${file%.*}_numbered_region.txt > ${file%.*}_numbered_region_temp.txt
+mv ${file%.*}_numbered_region_temp.txt ${file%.*}_numbered_region.txt
+
+# Remove trailing tab characters
+sed -i -e 's/^[ \t]*//' ${file%.*}_numbered_region.txt
+
+
+
+# Round counts to integer
+awk -v OFS='\t' '{$3=sprintf("%3.0f",$3)}1' ${file%.*}_tadtool.bed > ${file%.*}_tadtool_int.bed
+
+tr -d ' ' < ${file%.*}_tadtool_int.bed > ${file%.*}_tadtool_int_temp.bed
+mv ${file%.*}_tadtool_int_temp.bed ${file%.*}_tadtool_int.bed

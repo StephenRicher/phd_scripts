@@ -1,0 +1,10 @@
+
+
+
+dirs=($(find . -maxdepth 1 -type d))
+for D in "${dirs[@]}"; do
+  region=${D##*/}
+  for file in ${D}/*_R1_4_trim*; do
+    mv "${file}" "${file/_R1_4_trim/}"
+  done
+done

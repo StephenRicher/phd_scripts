@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+print_usage() {
+  echo "Usage: ..."
+}
+
+# Define default parameters that may be optionally specified
+inputBufferSize="400000"
+threads="4"
+binSize="1000"
+
+while getopts 'f:c:d:b:t:x:' flag; do
+  case "${flag}" in
+    f) file="${OPTARG}" ;;
+    c) capture_regions="${OPTARG}" ;;
+    d) rest_sites="${OPTARG}" ;;
+    b) binSize="${OPTARG}" ;;
+    t) threads="${OPTARG}" ;;
+    x) inputBufferSize="${OPTARG}" ;;
+    *) print_usage
+       exit 1 ;;
+  esac
+done
+
+# Extract sample name from file name.
+sample=${file%%.*}
+
+# Define name of summary file.
+summary_file=${sample}-summary.txt
+
+# Write header of summary file.
+echo -e sample'\t'capture_region'\t'valid_hic_pairs'\t'region_length'\t'hic_pairs_per_kb > ${summary_file}
+
+# Split file into forward and reverse read files.
+if [ ! -f ${sample}.R1.bam ]; then
+    samtools view -f 0x40 -b ${file} > ${sample}.R1.bam &
+fi
+
+if [ ! -f ${sample}.R2.bam ]; then
+    samtools view -f 0x80 -b ${file} > ${sample}.R2.bam
+fi
+
+# Count total number of valid hic pairs and write to file.
+echo -e ${sample}'\t'all'\t'$(samtools view -c ${sample}.R1.bam) >> ${summary_file}
+
+dir="all_regions"
+
+while IFS=$'\t' read -r chr start end region; do
+		
+	echo Beginning analysis of ${region} at chromosome ${chr} from ${start} to ${end}.	
+	
+	sub_dir=${dir}/${region}
+	mkdir -p ${sub_dir}
+	
+	hicBuildMatrix --samFiles ${sample}.R1.bam ${sample}.R2.bam \
+                   --region ${chr}:$((${start}+1))-${end} \
+                   --binSize ${binSize} \
+		           --outFileName ${sub_dir}/${sample}-${region}-${binSize}.h5 \
+                   --outBam ${sub_dir}/${sample}-${region}.bam \
+                   --QCfolder ${sub_dir}/${sample}-${region}-${binSize}_QC \
+                   --skipDuplicationCheck \
+                   --inputBufferSize ${inputBufferSize} \
+                   --threads ${threads}
+	
+	
+	# Correct SAM header to remove unused chromosomes. Can't use samtools reheader as it raises error for some reason...
+	cat <(samtools view -H ${sub_dir}/${sample}-${region}.bam | awk -v chr="@SQ\tSN:${chr}\t" '$0 ~ chr || /@HD/ || /@PG/') \
+        <(samtools view -S ${sub_dir}/${sample}-${region}.bam) | samtools view -Sb > ${sub_dir}/${sample}-${region}.tmp.bam
+
+	# Correct file name.
+	mv ${sub_dir}/${sample}-${region}.tmp.bam ${sub_dir}/${sample}-${region}.bam
+	
+	# Count number of region specific valid hic pairs and write to file.
+	read_count=$(($(samtools view -c ${sub_dir}/${sample}-${region}.bam) / 2))
+	# Note start is 0 based and end is 1 based
+	region_length=$((end - start))  
+	echo -e ${sample}'\t'${region}'\t'${read_count}'\t'${region_length}'\t'$((${read_count} / (${region_length} / 1000))) >> ${summary_file}
+
+	# Split forward and reverse reads.    
+	samtools view -f 0x40 -b ${sub_dir}/${sample}-${region}.bam > ${sub_dir}/${sample}-${region}.R1.bam &
+	samtools view -f 0x80 -b ${sub_dir}/${sample}-${region}.bam > ${sub_dir}/${sample}-${region}.R2.bam
+	
+	# Build matrix at restriction fragment resolution. Note specifying region does not work here.
+	hicBuildMatrix --samFiles ${sub_dir}/${sample}-${region}.R1.bam ${sub_dir}/${sample}-${region}.R2.bam \
+                   --restrictionCutFile <(awk -v chr=${chr} '$1 == chr' ${rest_sites}) \
+                   --outFileName ${sub_dir}/${sample}-${region}-rf.h5 \
+                   --QCfolder ${sub_dir}/${sample}-${region}-rf_QC \
+                   --skipDuplicationCheck
+	
+	# Remove regions outside of capture region.
+	hicAdjustMatrix --matrix ${sub_dir}/${sample}-${region}-rf.h5 \
+                    --action keep \
+                    --regions <(echo -e ${chr}'\t'${start}'\t'${end}) \
+                    --outFileName ${sub_dir}/${sample}-${region}-rf.tmp.h5
+	
+	# Correct file name
+	mv ${sub_dir}/${sample}-${region}-rf.tmp.h5 ${sub_dir}/${sample}-${region}-rf.h5
+
+	rm ${sub_dir}/${sample}-${region}.R1.bam ${sub_dir}/${sample}-${region}.R2.bam
+
+done <${capture_regions}
+

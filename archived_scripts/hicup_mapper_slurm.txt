@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=hicup_mapper_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_mapper_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_mapper_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-12:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load hicup/0.7.1
+module load samtools/1.9
+module load bowtie2
+
+bt2_index=${1}
+forward=${2}
+reverse=${3}
+outdir=${4}
+
+# Echo the file pairs being mapped. MUST be from same sample (ls above should output in alphabetical order to ensure this). 
+echo Mapping ${forward##*/} and ${reverse##*/} against ${bt2_index##*/}
+
+hicup_mapper --bowtie2 bowtie2 --outdir ${outdir} --index ${bt2_index} --format Sanger --threads ${SLURM_CPUS_PER_TASK} --zip ${forward} ${reverse}
+

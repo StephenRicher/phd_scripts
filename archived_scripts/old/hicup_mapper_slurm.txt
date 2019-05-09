@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --array=1-6
+#SBATCH --job-name=hicup_mapper_%A_%a
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_mapper_%A_%a.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_mapper_%A_%a.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-12:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/hicup/
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load hicup/0.7.1
+module load samtools/1.9
+module load bowtie2
+
+# Extract forward and reverse truncated files.
+forward=$(ls *R1_trim\.trunc\.fastq\.gz | sed -n ${SLURM_ARRAY_TASK_ID}p)
+reverse=$(ls *R4_trim\.trunc\.fastq\.gz | sed -n ${SLURM_ARRAY_TASK_ID}p)
+
+# Define location of bowtie2 index - use "GRCh38" for normal index and "GRCh38_masked" for snp masked index.
+bt2_index="/home/u/sr467/scratch/projects/genomes/GRCh38/bt2_index/GRCh38"
+
+# Echo the file pairs being mapped. MUST be from same sample (ls above should output in alphabetical order to ensure this). 
+echo Mapping ${forward} and ${reverse}
+
+hicup_mapper --bowtie2 bowtie2 --index ${bt2_index} --format Sanger --threads ${SLURM_CPUS_PER_TASK} --zip ${forward} ${reverse}
+
+# If last job in array then run hicup filter
+if [[ $(squeue -j ${SLURM_JOB_ID} | wc -l) -eq 2 ]]
+then
+sbatch /home/u/sr467/scripts/hicup_filter_slurm.txt
+fi

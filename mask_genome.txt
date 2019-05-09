@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Specify path to reference genome and SNP sites from same genome build.
+genome="/home/stephen/x_am/RC-BB1219/stephen/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+
+
+for sample in HB2_WT HB2_CL4 MCF7; do
+{
+  bedtools maskfasta -fullHeader -fi <(gunzip -c ${genome}) -bed ${sample}_all_regions_hapcompass_MWER_solution.txt.vcf -fo /dev/stdout |
+  gzip > ${genome%.fa.gz}_${sample}_masked.fa.gz
+
+} &
+done; wait

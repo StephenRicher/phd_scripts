@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=hicup_filter_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_filter_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hicup_filter_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-06:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+# Digest file is first argument.
+digest="${1}"
+
+# Out directory is second argument.
+outdir="${2}"
+
+# All other arguments are files to filter
+shift 2
+
+hicup_filter="/home/u/sr467/scripts/HiCUP-master/hicup_filter"
+
+mpirun ${hicup_filter} --outdir ${outdir} --shortest 100 --longest 700 --digest ${digest} --zip --threads ${SLURM_CPUS_PER_TASK} "${@}"

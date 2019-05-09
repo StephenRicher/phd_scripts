@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+awk '$4 ~ /^these/ {total += $1} $4 ~ /^unpaired/ {unpaired += $1} $4 == 0 {zero += $1} $4 ~ /^exactly/ {once += $1} $4 ~ /^>1/ {multiple += $1} END {printf "%d reads; of these:\n  %d (%0.2f%) were unpaired; of these:\n    %d (%0.2f%) aligned 0 times\n    %d (%0.2f%) aligned exactly 1 time\n    %d (%0.2f%) aligned >1 times\n" , total, unpaired, 100*unpaired/total, zero, 100*zero/total, once, 100*once/total, multiple, 100*multiple/total}' ${1}

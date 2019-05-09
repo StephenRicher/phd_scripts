@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=bt2_index_%j
+#SBATCH --output=bt2_index_%j.out
+#SBATCH --error=bt2_index_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=0-01:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/genomes/GRCh38/bt2_index/
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load bowtie2
+
+# Specify reference genome to build index from.
+genome=$1
+
+# Specify base of index.
+bt2_base=$2
+
+echo Indexing ${genome##*/} with bowtie2 using basename ${bt2_base}
+
+mpirun bowtie2-build --threads ${SLURM_CPUS_PER_TASK} ${genome} ${bt2_base}
+
