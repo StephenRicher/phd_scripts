@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 
+# Raw sequence directory
+raw_dir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/"
+
+# Reference genome download parameters
+genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+
 # General parameters
-qc_directory="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/qc_logs/"
+qc_dir="${raw_dir%/*}""/qc_logs/"
 threads="6"
 
 # Define paths to relevant bash scripts
@@ -11,19 +18,12 @@ digest_genome="/home/stephen/h/phd/scripts2/digest_genome.sh"
 truncate_reads="/home/stephen/h/phd/scripts2/hic_truncater.sh"
 split_fastq="/home/stephen/h/phd/scripts2/split_fastq.sh"
 
-# Raw sequence directory
-raw_dir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/"
-
-# Reference genome download parameters
-genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-
 # Bowtie2 index parameters
-bt2_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/bt2_index/"
+bt2_dir="${genome_dir%/*}""/bt2_index/"
 bt2_basename="GRCh38_primary_assembly"
 
 # Reference genome digest parameters
-digest_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/digest/"
+digest_dir="${genome_dir%/*}""/digest/"
 digest_prefix="${bt2_basename}"
 re_name="Mbo1"
 re_recognition="^GATC"
@@ -39,7 +39,9 @@ min_qual="20"
 
 # Split FASTQ file parameters
 reads_per_file="10000000"
-split_fastq_outdir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/split_reads/"
+split_fastq_dir="${raw_dir%/*}""/split_reads/"
+
+# mkdir -p "${genome_dir}" "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_fastq_dir}"
 
 # Download GRCh38 primary assembly and remove any FASTA line wrapping.
 #curl "${genome_url}" | gunzip | "${remove_wrapping}" | gzip > "${genome_dir}"
@@ -48,12 +50,12 @@ split_fastq_outdir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analy
 #if "${validate_fasta}" "${genome_dir}"; then
 #  "${digest_genome}" "${re_recognition}" "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
 #  bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
-#  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_directory%*/}"/"${bt2_basename}".bt2_index_summary.txt
+#  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
 #fi
 
-#fastqc --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].*f*q*
+#fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
-#fastq_screen --aligner bowtie2 --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].*f*q*
+#fastq_screen --aligner bowtie2 --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
 for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
   break
@@ -62,17 +64,17 @@ for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
            --gc-content ${gc} --minimum-length ${min_length} \
            --quality-cutoff ${min_qual} --cores "${threads}" \
            --output "${raw_dir%*/}"/${sample}-R1.trim.fq.gz --paired-output "${raw_dir%*/}"/${sample}-R4.trim.fq.gz \
-           "${raw_dir%*/}"/${sample}-R1.f*q.gz "${raw_dir%*/}"/${sample}-R4.f*q.gz > "${qc_directory%*/}"/${sample}.cutadapt.txt
+           "${raw_dir%*/}"/${sample}-R1.f*q.gz "${raw_dir%*/}"/${sample}-R4.f*q.gz > "${qc_dir%*/}"/${sample}.cutadapt.txt
 done
 
-#fastqc --threads ${threads} --outdir "${qc_directory}" "${raw_dir%*/}"/*R[14].trim.fq.gz
+#fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].trim.fq.gz
 
 while IFS=  read -r -d $'\0' trimmed_fastq; do
   sample="${trimmed_fastq##*/}"; sample="${sample%*.fq.gz}"
-  "${truncate_reads}" "${re_recognition}" "${trimmed_fastq}" 2> "${qc_directory%*/}"/"${sample}".trunc_summary.txt \
+  "${truncate_reads}" "${re_recognition}" "${trimmed_fastq}" 2> "${qc_dir%*/}"/"${sample}".trunc_summary.txt \
     | gzip > "${raw_dir%*/}"/"${sample}".trunc.fq.gz &
 done < <(find "${raw_dir}" -type f -name "*.trim.fq.gz" -print0)
 wait
 
-"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_outdir}" -t "${threads}" "${raw_dir%*/}"/*.trunc.fq.gz
+"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_dir}" -t "${threads}" "${raw_dir%*/}"/*.trunc.fq.gz
 
