@@ -44,7 +44,9 @@ if [[ "${block_size}" == 1 ]]; then
   zcat -f "${1}" | shuf --random-source=<(get_seeded_random "${seed}") -n "${sample_size}"
 else
   zcat -f "${1}" \
-    | awk -v n="${block_size}" '{printf("%s%s",$0,(NR%n==0)?"\n":"\0")}' \
+    | awk -v n="${block_size}" '
+        {printf("%s%s",$0,(NR%n==0)?"\n":"\0")}
+        END {if(NR % n != 0) print "Error: Total lines not divisible by block size." > "/dev/stderr"}' \
     | shuf --random-source=<(get_seeded_random "${seed}") -n "${sample_size}" \
     | tr "\0" "\n"
 fi
