@@ -30,23 +30,29 @@ get_seeded_random()
     </dev/zero 2>/dev/null
 }
 
-if [ -z "${1}" ]; then
-  >&2 echo "Error: no file has been specified to sample."
-  exit 1
-fi
+# If arg is '-' then shift to unset variable.
+test "${1}" == "-" && shift
+# If input unset or empty then set to /dev/stdin.
+input="${1:-/dev/stdin}"
 
-if [ ! -f "${1}" ]; then
-  >&2 echo "Error: "${1}" is not a valid file."
-  exit 1
+if [[ "${input}" != "/dev/stdin" ]]; then
+  if [ -z "${input}" ]; then
+    >&2 echo "Error: no file has been specified to sample."
+    exit 1
+  fi
+  if [ ! -f "${input}" ]; then
+    >&2 echo "Error: "${input}" is not a valid file."
+    exit 1
+  fi
 fi
 
 if [[ "${block_size}" == 1 ]]; then
-  zcat -f "${1}" | shuf --random-source=<(get_seeded_random "${seed}") -n "${sample_size}"
+  zcat -f "${input}" | shuf --random-source=<(get_seeded_random "${seed}") -n "${sample_size}"
 else
-  zcat -f "${1}" \
+  zcat -f "${input}" \
     | awk -v n="${block_size}" '
-        {printf("%s%s",$0,(NR%n==0)?"\n":"\0")}
-        END {if(NR % n != 0) print "Error: Total lines not divisible by block size." > "/dev/stderr"}' \
+        ORS=NR%n?"\0":"\n"
+        END {if(NR % n != 0) print "Error: Total lines not divisible by block size.\n" > "/dev/stderr"}' \
     | shuf --random-source=<(get_seeded_random "${seed}") -n "${sample_size}" \
     | tr "\0" "\n"
 fi
