@@ -9,12 +9,12 @@ args = parser.parse_args()
 
 @contextlib.contextmanager
 def smart_open (filename, mode = "read"):
-    """ Custom context file opener which can read from stdin (default) aswell as read uncompressed and gzipped 
-        data from input files. Named pipes are auto detected and read but cannot be in gzip format. It can write 
+    """ Custom context file opener which can read from uncompressed and gzip compressed data from stdin (default)
+        input files. Named pipes are auto detected and read but cannot be in gzip format. It can write 
         to stdout (default) or to a specified outfile. Outfiles suffixed with '.gz' are automatically gzipped. """
     
-    def is_named_pipe (filename):
-        """ Check if input file is a named pipe """
+    def named_pipe (filename):
+        """ Return true if input file is a named pipe """
         return stat.S_ISFIFO(os.stat(args.file).st_mode)
     
     def is_gzip (filename):
@@ -31,7 +31,7 @@ def smart_open (filename, mode = "read"):
             # If filename is a named pipe (i.e. via process substitution) 
             # then do not check if gzip because this will close the pipe. 
             # Otherwise check if file is gzipped.
-            if not is_named_pipe(filename) and is_gzip(filename):
+            if not named_pipe(filename) and is_gzip(filename):
                 try:
                     fh = gzip.open(filename, 'rt')
                 except IOError as e:
@@ -43,7 +43,10 @@ def smart_open (filename, mode = "read"):
                     sys.exit(str(e))
         else:
             if not sys.stdin.isatty():
-                fh = sys.stdin
+                if sys.stdin.buffer.peek(2).hex()[0:4] == '1f8b':
+                    fh = gzip.open(sys.stdin.buffer, mode = 'rt')
+                else:
+                    fh = sys.stdin
             else:
                 sys.exit("Nothing in stdin and no infile provided.")
     elif mode == "write":
@@ -75,10 +78,9 @@ if not args.file and sys.stdin.isatty():
 
 # Test functionality
 with smart_open(args.file, mode = "read") as f, smart_open(args.out, mode = "write") as out:
-    
     try:
         for line in f:
             out.write(line)
     except UnicodeError as e:
-        sys.exit("Error: {}\nPossible cause: GZIP compressed data may have been input via named pipe (i.e. process substituion)\nSolution: Decompress prior to process substitution (e.g. python3 script.py -f <(cat test.txt.gz | gunzip))".format(str(e)))
+        sys.exit("Error: {}\nPossibly compressed data in process substitution.".format(str(e)))
             
