@@ -1,11 +1,6 @@
 #!/usr/bin/env python
- 
-import argparse, sys, gzip, contextlib, os, stat
-import select
-parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--file", help = "Specify input file name", nargs = "?")
-parser.add_argument("-o", "--out", help = "Specify output file name", nargs = "?")
-args = parser.parse_args()
+
+import argparse, sys, gzip, contextlib, os, stat, select
 
 @contextlib.contextmanager
 def smart_open (filename, mode = "read"):
@@ -78,6 +73,12 @@ def smart_open (filename, mode = "read"):
             fh.close()
 
 if __name__ == '__main__':
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file", help = "Specify input file name", nargs = "?")
+    parser.add_argument("-o", "--out", help = "Specify output file name", nargs = "?")
+    args = parser.parse_args()
+    
     if not args.file and sys.stdin.isatty():
         parser.print_help()
 
