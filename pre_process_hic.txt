@@ -5,7 +5,7 @@ raw_dir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_dat
 
 # Reference genome download parameters
 genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
 
 # General parameters
 qc_dir="${raw_dir%/*}""/qc_logs/"
@@ -13,8 +13,8 @@ threads="6"
 
 # Define paths to relevant bash scripts
 remove_wrapping="/home/stephen/h/phd/scripts2/remove_fasta_wrapping.sh"
-validate_fasta="/home/stephen/h/phd/scripts2/validate_fasta.sh"
-digest_genome="/home/stephen/h/phd/scripts2/digest_genome.sh"
+validate_fasta="/home/stephen/h/phd/scripts2/validate_fasta.py"
+digest_genome="/home/stephen/h/phd/scripts2/digest.py"
 truncate_reads="/home/stephen/h/phd/scripts2/hic_truncater.sh"
 split_fastq="/home/stephen/h/phd/scripts2/split_fastq.sh"
 
@@ -41,17 +41,17 @@ min_qual="20"
 reads_per_file="10000000"
 split_fastq_dir="${raw_dir%/*}""/split_reads/"
 
-# mkdir -p "${genome_dir}" "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_fastq_dir}"
+mkdir -p "${genome_dir%/*}"/ "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_fastq_dir}"
 
 # Download GRCh38 primary assembly and remove any FASTA line wrapping.
-#curl "${genome_url}" | gunzip | "${remove_wrapping}" | gzip > "${genome_dir}"
+curl "${genome_url}" | gunzip | "${remove_wrapping}" | gzip > "${genome_dir}"
 
 # Ensure FASTA is in valid format and generate Mbo1 digest and Bowtie2 index.
-#if "${validate_fasta}" "${genome_dir}"; then
-#  "${digest_genome}" "${re_recognition}" "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
-#  bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
-#  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
-#fi
+if "${validate_fasta}" -f "${genome_dir}"; then
+  "${digest_genome}" "${re_recognition}" -f "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
+  bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
+  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
+fi
 
 #fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
