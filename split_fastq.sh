@@ -28,9 +28,18 @@ if [[ ! -d "${outdir}" ]]; then
   exit 1
 fi
 
+for file in "${@}"; do
+  if [[ ! -f "${file}" ]]; then
+    >&2 echo "Error "${file}" is not a valid file."
+    exit 1
+  fi
+done
+
 split_fastq() {
+  shopt -s extglob
+  prefix="${3%*/}"/"${1##*/}"; prefix="${prefix%.f*q?(.gz)}".part
   zcat -f "${1}" \
-    | split -l $(("${2}"*4)) --filter='gzip > "${3%*/}"/"${FILE}".gz' - "${1%.gz}"
+    | split -l $(("${2}"*4)) --filter='gzip > "${FILE}".fq.gz' - "${prefix}"
 }
 
 export -f split_fastq
