@@ -21,9 +21,9 @@ with open("/home/stephen/h/phd/scripts2/testing/hic_filter/test_selfcircle.sam")
             reads1.append(sam(line.split()))
             reads2.append(sam(next(f).split()))
 
-# Iterate through each pair of parameters
-@pytest.mark.parametrize('read1', reads1)
-@pytest.mark.parametrize('read2', reads2)
+# Convert reads1 and reads2 to list of tuples and set as parameters.
+# The class method allows us to re use these parameters multiple times...
+@pytest.mark.parametrize('read1, read2', list(zip(reads1, reads2)))
 class TestParametrized:
 
     @pytest.mark.parametrize('output', [True])
