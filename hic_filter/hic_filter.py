@@ -1,11 +1,59 @@
 #!/usr/bin/env python3
 
-import collections
-import bisect
-import time
-import re
+import collections, bisect, time, re, sys, math
+
+class IntRange():
+    """ Descriptor to validate attribute format with custom
+    integer range. https://dev.to/dawranliou/writing-descriptors-in-python-36"""
+    
+    def __init__(self, minimum, maximum):
+        self.minimum = minimum
+        self.maximum = maximum
+    
+    def __get__(self, instance, owner):
+        return instance.__dict__[self.name]
+
+    def __set__(self, instance, value):
+        if not isinstance(value, int):
+            raise TypeError(f'Error: {self.name} must be integer.')
+        elif not self.minimum <= value <= self.maximum:
+            raise ValueError(f'Error: {self.name} out of range.')
+        instance.__dict__[self.name] = value
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+class RegexMatch():
+
+    def __init__(self, regex):
+        self.regex = regex
+    
+    def __get__(self, instance, owner):
+        return instance.__dict__[self.name]
+
+    def __set__(self, instance, value):
+        if not isinstance(value, str):
+            raise TypeError(f'Error: {self.name} must be string.')
+        elif not re.match(self.regex, value):
+            raise ValueError(f'Invalid format in {self.name}.')
+        instance.__dict__[self.name] = value
+
+    def __set_name__(self, owner, name):
+        self.name = name
 
 class sam:
+
+    qname = RegexMatch(re.compile(r"^[!-?A-~]+$"))
+    flag = IntRange(0, (2**16) - 1)
+    rname = RegexMatch(re.compile(r"^\*$|^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$"))
+    left_pos = IntRange(0, (2**31) - 1)
+    mapq = IntRange(0, (2**8) - 1)
+    cigar = RegexMatch(re.compile(r"^\*$|^([0-9]+[MIDNSHPX=])+$"))
+    rnext = RegexMatch(re.compile(r"^\*$|^=$|^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$"))
+    pnext = IntRange(0, (2**31) - 1)
+    tlen = IntRange((-2**31) + 1, (2**31) - 1)
+    seq = RegexMatch(re.compile(r"^\*$|^[A-Za-z=.]+$"))
+    qual = RegexMatch(re.compile(r"^[!-~]+$"))
     
     def __init__(self, sam_line):
         self.qname = sam_line[0]
@@ -20,7 +68,6 @@ class sam:
         self.seq = sam_line[9]
         self.qual = sam_line[10]
         self.optional = sam_line[11:]
-        self.fragment = None
     
     @property    
     def is_reverse(self):
@@ -56,10 +103,7 @@ class sam:
     
     @property
     def three_prime_pos(self):
-        if self.is_reverse:
-            return self.left_pos
-        else:
-            return self.right_pos
+        return self.left_pos if self.is_reverse else self.right_pos
     
     @property
     def middle_pos(self):
@@ -71,6 +115,11 @@ class sam:
             self.rnext, self.pnext, self.tlen, self.seq, self.qual, '\t'.join(map(str,self.optional)))
 
 class fragment:
+    
+    fragment_number = IntRange(0, math.inf)
+    fragment_start = IntRange(0, math.inf)
+    fragment_end = IntRange(0, math.inf)
+    
     def __init__(self, fragment_number, start, end):
         self.fragment_number = fragment_number
         self.start = start
@@ -78,17 +127,21 @@ class fragment:
 
 def is_valid(read1, read2):
     if read1.qname != read2.qname:
-        print ("Error: Qname mismatch: {} {} - is file name sorted?".format(read1.qname, read2.qname))
+        eprint ("Error: Qname mismatch: {} {} - is file name sorted?".format(read1.qname, read2.qname))
     elif not read1.is_paired and not read2.is_paired:
-        print("Error: {} is not paired".format(read1.qname))
+        eprint("Error: {} is not paired".format(read1.qname))
     elif read1.is_read1 == read2.is_read1:
-        print("Error: R1 and R2 flags in {} not correctly set".format(read1.qname))
+        eprint("Error: R1 and R2 flags in {} not correctly set".format(read1.qname))
     elif read1.pnext != read2.left_pos or read2.pnext != read1.left_pos:
-        print("Error: Mate position mismatch in {}.".format(read1.qname))
+        eprint("Error: Mate position mismatch in {}.".format(read1.qname))
     else:
         return True
     return False
-  
+    
+def eprint(*args, **kwargs):
+    """ Print to stderr """
+    print(*args, file = sys.stderr, **kwargs)
+
 def is_trans(read1, read2):
     """ Return true if reads do not align to same reference """
     return read1.rname != read2.rname
@@ -97,7 +150,6 @@ def get_fragment(read, digest):
     rf_num = bisect.bisect_left(digest[read.rname], read.middle_pos)
     rf_start = 1 if rf_num == 0 else digest[read.rname][rf_num - 1] + 1
     rf_end = digest[read.rname][rf_num]
-    read.fragment = rf_num
     return fragment(rf_num, rf_start, rf_end)
     
 def tag_length(read, fragment):
@@ -110,10 +162,14 @@ def process_digest(digest_filename):
     with open(digest_filename) as digest:
         d = {}
         for fragment in digest:
-            [chromosome, start, end, fragment_number] = fragment.split()
-            if chromosome not in d.keys():
-                d[chromosome] = []
-            d[chromosome].append(int(end))
+            [ref, start, end, fragment_number] = fragment.split()
+            if not (int(start) > 0 and int(end) > 0):
+                raise ValueError(f'Negative fragment start/end positions on ref {ref}.')
+            if ref not in d.keys():
+                if not (int(start) == 1 and int(fragment_number) == 1):
+                    raise ValueError(f'Invalid first fragment in ref {ref}.')
+                d[ref] = []
+            d[ref].append(int(end))
     return(d)
 
 def reorder_read_pair(read1, read2):
@@ -148,15 +204,12 @@ def get_orientation(read1, read2):
             orientation = "same_forward"
     return orientation
        
-def on_same_fragment(read1, read2):
-    if read1.fragment == None or read2.fragment == None:
-        sys.exit("Error read fragment not set for {}.".format(read1.qname))
-    return read1.fragment == read2.fragment
+def on_same_fragment(r1_fragment, r2_fragment):
+    return r1_fragment.fragment_number == r2_fragment.fragment_number
 
-def on_adjacent_fragments(read1, read2):
-    if read1.fragment == None or read2.fragment == None:
-        sys.exit("Error read fragment not set for {}.".format(read1.qname))
-    return abs(read1.fragment - read2.fragment) == 1
+def on_adjacent_fragments(r1_fragment, r2_fragment):
+    return abs(r1_fragment.fragment_number == r2_fragment.fragment_number) == 1
+
 
 def run_filter(read1, read2, digest):
     if not is_valid(read1, read2):
@@ -171,14 +224,14 @@ def run_filter(read1, read2, digest):
             status = "wrong_size"
         elif is_trans(read1, read2):
             status = "valid_trans"
-        elif on_same_fragment(read1, read2):
+        elif on_same_fragment(read1_fragment, read2_fragment):
             if orientation == "outward":
                 status = "self_circle"
             elif orientation == "inward":
                 status = "dangling_end"
             else:
                 status = "same_strand_error"
-        elif orientation == "inward" and on_adjacent_fragments(read1, read2):
+        elif orientation == "inward" and on_adjacent_fragments(read1_fragment, read2_fragment):
             status = "religation"
         elif orientation == "inward" and 150 < read2.five_prime_pos - read1.five_prime_pos + 1 < 800:
             status = "contiguous"
@@ -202,7 +255,7 @@ def main():
                     read1 = sam(line.split())
                     read2 = sam(next(sam_file).split())
                 except StopIteration:
-                    print ("Error: odd number of fastq sequences in file")
+                    eprint ("Error: odd number of alignments in file")
                 status = run_filter(read1, read2, d)
                 
                 read1.optional.append("hf:Z:{}".format(status))
@@ -212,7 +265,7 @@ def main():
                 print(read1.print_sam())
                 print(read1.print_sam())
         for key,val in stats.items():
-            print (key, "\t", val)
+            eprint (key, "\t", val)
 
 def pysam_test():
     import pysam
