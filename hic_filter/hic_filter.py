@@ -1,10 +1,35 @@
 #!/usr/bin/env python3
 
-import collections, bisect, time, re, sys, math
+import argparse, contextlib, collections, bisect, time, re, sys, math
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--file", help = "Specify sam file.", nargs = "?")
+parser.add_argument("-d", "--digest", help = "Specify digest file.")
+args = parser.parse_args()
+
+@contextlib.contextmanager
+def smart_read (filename):
+    """ Custom context file opener which can read from from stdin or input file."""
+    
+    if filename and filename != '-':
+        try:
+            fh = open(filename, 'rt')
+        except IOError as e:
+            sys.exit(str(e))
+    else:
+        if not sys.stdin.isatty():
+            fh = sys.stdin
+        else:
+            sys.exit("Nothing in stdin and no infile provided.")
+    try:
+        yield fh
+    finally:
+        if fh not in [sys.stdin]:
+            fh.close()
 
 class IntRange():
     """ Descriptor to validate attribute format with custom
-    integer range. https://dev.to/dawranliou/writing-descriptors-in-python-36"""
+    integer range. """
     
     def __init__(self, minimum, maximum):
         self.minimum = minimum
@@ -194,14 +219,14 @@ def get_orientation(read1, read2):
     
     if read1.is_reverse:
         if read2.is_reverse:
-            orientation = "same_reverse"
+            orientation = "sr"
         else:
-            orientation = "outward"
+            orientation = "o"
     else:
         if read2.is_reverse:
-            orientation = "inward"
+            orientation = "i"
         else:
-            orientation = "same_forward"
+            orientation = "sf"
     return orientation
        
 def on_same_fragment(r1_fragment, r2_fragment):
@@ -210,43 +235,23 @@ def on_same_fragment(r1_fragment, r2_fragment):
 def on_adjacent_fragments(r1_fragment, r2_fragment):
     return abs(r1_fragment.fragment_number == r2_fragment.fragment_number) == 1
 
-
 def run_filter(read1, read2, digest):
-    if not is_valid(read1, read2):
-        status = "invalid_format"
-    else:
-        read1, read2 = reorder_read_pair(read1, read2)
-        orientation = get_orientation(read1, read2)
-        read1_fragment = get_fragment(read1, digest)
-        read2_fragment = get_fragment(read2, digest)
-        ditag_length = tag_length(read1, read1_fragment) + tag_length(read2, read2_fragment)
-        if ditag_length < 150 or ditag_length > 800:
-            status = "wrong_size"
-        elif is_trans(read1, read2):
-            status = "valid_trans"
-        elif on_same_fragment(read1_fragment, read2_fragment):
-            if orientation == "outward":
-                status = "self_circle"
-            elif orientation == "inward":
-                status = "dangling_end"
-            else:
-                status = "same_strand_error"
-        elif orientation == "inward" and on_adjacent_fragments(read1_fragment, read2_fragment):
-            status = "religation"
-        elif orientation == "inward" and 150 < read2.five_prime_pos - read1.five_prime_pos + 1 < 800:
-            status = "contiguous"
-        else:
-            status = "valid_cis"
-        return status
+    valid = is_valid(read1, read2)
+    read1, read2 = reorder_read_pair(read1, read2)
+    orientation = get_orientation(read1, read2)
+    read1_fragment = get_fragment(read1, digest)
+    read2_fragment = get_fragment(read2, digest)
+    ditag_length = tag_length(read1, read1_fragment) + tag_length(read2, read2_fragment)
+    insert_size = read2.right_pos - read1.left_pos + 1
+    trans = is_trans(read1, read2)
+    fragment_seperation = abs(read2_fragment.fragment_number - read1_fragment.fragment_number)
+    # ADD this to a dictionary??
+    return valid, orientation, ditag_length, insert_size, trans, fragment_seperation
                 
-
 def main():
-    digest_filename="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/digest/GRCh38_primary_assembly_Mbo1_digest.txt"
-    d = process_digest(digest_filename)
-    stats = {"total_pairs": 0, "invalid_format": 0, "wrong_size": 0, "self_circle": 0, "dangling_end": 0, 
-        "same_strand_error": 0, "religation": 0, "contiguous": 0, "valid_cis": 0, "valid_trans": 0}
-        
-    with open("/media/stephen/Data/hic_analysis/data/HB2_CL4-1.fix.pair.sam") as sam_file:
+    d = process_digest(args.digest)
+
+    with smart_read(args.file) as sam_file:
         for line in sam_file:
             if line.startswith("@"):
                 continue
@@ -256,17 +261,9 @@ def main():
                     read2 = sam(next(sam_file).split())
                 except StopIteration:
                     eprint ("Error: odd number of alignments in file")
-                status = run_filter(read1, read2, d)
+                valid, orientation, ditag_length, insert_size, trans, fragment_seperation = run_filter(read1, read2, d)
+                print(read1.qname, valid, orientation, ditag_length, insert_size, trans, fragment_seperation)
                 
-                read1.optional.append("hf:Z:{}".format(status))
-                read2.optional.append("hf:Z:{}".format(status))
-                stats["total_pairs"] += 1
-                stats[status] += 1
-                print(read1.print_sam())
-                print(read1.print_sam())
-        for key,val in stats.items():
-            eprint (key, "\t", val)
-
 def pysam_test():
     import pysam
     samfile = pysam.AlignmentFile("/media/stephen/Data/hic_analysis/data/test.sam", "rb")
@@ -287,6 +284,8 @@ def pysam_test():
     mysamfile.close()
             
 if __name__ == "__main__":
+    if not args.file and sys.stdin.isatty():
+        parser.print_help()
     main()
     #pysam_test()
     
