@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Define cores
+threads="${2}"
+
+capture_regions="${1}"
+
+shift 2
+
+for bam in "${@}"; do
+
+  while IFS=$'\t' read -r chr start end region; do
+
+    length=$((end-start))
+
+    samtools view -h "${bam}" "${chr}":$((start+1))-"${end}" \
+      | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" '/^@SQ/ {if($2!="SN:"chr) {next} else {$3="LN:"len}} !/^@/ {$4=$4-start; $8=$8-start} {print}' \
+      | samtools sort -n -m 3G -l 0 -@ "${threads}" - \
+      | samtools fixmate -p -@ "${threads}" - - \
+      | samtools view -f 1 -F 12 -b -@ "${threads}" > "${bam%%.*}"."${region}".bam
+
+  done <"${capture_regions}"
+
+done
