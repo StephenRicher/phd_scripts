@@ -50,14 +50,14 @@ while IFS=$'\t' read -r chr start end region; do
 	echo Beginning analysis of ${region} at chromosome ${chr} from ${start} to ${end}.	
 	
 	sub_dir=${dir}/${region}
-	mkdir -p ${sub_dir}
+	mkdir -p "${sub_dir}"/{"${binSize}",rf}
 	
 	hicBuildMatrix --samFiles ${sample}.R1.bam ${sample}.R2.bam \
                    --region ${chr}:$((${start}+1))-${end} \
                    --binSize ${binSize} \
-		           --outFileName ${sub_dir}/${sample}-${region}-${binSize}.h5 \
+		           --outFileName ${sub_dir}/${binSize}/${sample}-${region}-${binSize}.h5 \
                    --outBam ${sub_dir}/${sample}-${region}.bam \
-                   --QCfolder ${sub_dir}/${sample}-${region}-${binSize}_QC \
+                   --QCfolder ${sub_dir}/${binSize}/${sample}-${region}-${binSize}_QC \
                    --skipDuplicationCheck \
                    --inputBufferSize ${inputBufferSize} \
                    --threads ${threads}
@@ -83,18 +83,18 @@ while IFS=$'\t' read -r chr start end region; do
 	# Build matrix at restriction fragment resolution. Note specifying region does not work here.
 	hicBuildMatrix --samFiles ${sub_dir}/${sample}-${region}.R1.bam ${sub_dir}/${sample}-${region}.R2.bam \
                    --restrictionCutFile <(awk -v chr=${chr} '$1 == chr' ${rest_sites}) \
-                   --outFileName ${sub_dir}/${sample}-${region}-rf.h5 \
-                   --QCfolder ${sub_dir}/${sample}-${region}-rf_QC \
+                   --outFileName ${sub_dir}/rf/${sample}-${region}-rf.h5 \
+                   --QCfolder ${sub_dir}/rf/${sample}-${region}-rf_QC \
                    --skipDuplicationCheck
 	
 	# Remove regions outside of capture region.
-	hicAdjustMatrix --matrix ${sub_dir}/${sample}-${region}-rf.h5 \
+	hicAdjustMatrix --matrix ${sub_dir}/rf/${sample}-${region}-rf.h5 \
                     --action keep \
                     --regions <(echo -e ${chr}'\t'${start}'\t'${end}) \
-                    --outFileName ${sub_dir}/${sample}-${region}-rf.tmp.h5
+                    --outFileName ${sub_dir}/rf/${sample}-${region}-rf.tmp.h5
 	
 	# Correct file name
-	mv ${sub_dir}/${sample}-${region}-rf.tmp.h5 ${sub_dir}/${sample}-${region}-rf.h5
+	mv ${sub_dir}/rf/${sample}-${region}-rf.tmp.h5 ${sub_dir}/rf/${sample}-${region}-rf.h5
 
 	rm ${sub_dir}/${sample}-${region}.R1.bam ${sub_dir}/${sample}-${region}.R2.bam
 
