@@ -21,14 +21,17 @@ samples=("HB2_CL4_G1" "HB2_CL4_G2" "HB2_WT_G1" "HB2_WT_G2" "MCF7_G1" "MCF7_G2")
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
 delete=()
 for sample in "${samples[@]}"; do
-  for replicate in 1 2; do
-    info=( $(hicInfo --matrices 1000/${sample}-${replicate}*1000.h5) )
-    matrix_size=${info[13]/,/}
-    matrix_sum=${info[19]/,/}
-    matrix_density=$(echo "scale=3; ${matrix_sum} / (${matrix_size} * ${matrix_size})" | bc)
-    if [[ "${matrix_density}" == "0" ]]; then
-      echo "Removing "${sample}" from analysis due to insufficient interactions"
-      delete+=("${sample}")
+  for matrix in 1000/"${sample}"*.h5; do
+    # Check if exists since empty directories will return null glob
+    if [[ -f "${matrix}" ]]; then
+      info=( $(hicInfo --matrices "${matrix}") )
+      matrix_size=${info[13]/,/}
+      matrix_sum=${info[19]/,/}
+      matrix_density=$(echo "scale=3; ${matrix_sum} / (${matrix_size} * ${matrix_size})" | bc)
+      if [[ "${matrix_density}" == "0" ]]; then
+        >&2 echo "Removing "${sample}" from analysis due to insufficient interactions"
+        delete+=("${sample}")
+      fi
     fi
   done
 done
@@ -41,21 +44,22 @@ for target in "${delete[@]}"; do
   done
 done
 
-# Find all 1000 bin matrices that match kept samples.
-matrices=()
-for sample in "${samples[@]}"; do
-  while IFS=  read -r -d $'\0'; do
-    matrices+=("$REPLY")
-  done < <(find ./1000 -type f -name "${sample}*-1000.h5" -print0)
+# Of the retained samples, normalise the rf and 1000 bin size matrices seperately.
+for bin in rf 1000; do
+  # Find all matrices that match kept samples.
+  matrices=()
+  for sample in "${samples[@]}"; do
+    while IFS=  read -r -d $'\0'; do
+      matrices+=("$REPLY")
+    done < <(find ./"${bin}" -type f -name "${sample}*-"${bin}".h5" -print0)
+  done
+  matrices_norm=("${matrices[@]/.h5/-norm.h5}")
+  hicNormalize --matrices "${matrices[@]}" --outFileName "${matrices_norm[@]}" --normalize smallest
 done
-
-# Create array with modified matrix filenames
-matrices_norm=("${matrices[@]/.h5/-norm.h5}")
-
-# Begin by normalizing read count of all unprocessed matrices
-hicNormalize --matrices "${matrices[@]}" --outFileName "${matrices_norm[@]}" --normalize smallest
+# Note matrices_norm is defined for 1000 bin size matrices after for loop.
 
 # Merge matrices at varying bin sizes and generate diagnostic plots to view bin read count distribution.
+mkdir -p correlation_plots diagnostic_plots
 for i in $(seq 1000 1000 20000) $(seq 30000 10000 100000) $(seq 120000 20000 200000); do
   mkdir -p "${i}"
   for matrix in "${matrices_norm[@]}"; do
@@ -65,15 +69,13 @@ for i in $(seq 1000 1000 20000) $(seq 30000 10000 100000) $(seq 120000 20000 200
     fi
     hicCorrectMatrix diagnostic_plot --matrix "${i}"/"${matrix_rmpath}" -o diagnostic_plots/${matrix_rmpath%.h5}_diagnostic.png
   done
+  hicCorrelate --matrices "${i}"*-norm.h5 --outFileNameHeatmap correlation_plots/${region}-"${i}"-heatmap.png --outFileNameScatter ${region}-"${i}"-scatter.png --threads 6 --method pearson
 done
+hicCorrelate --matrices rf/*-norm.h5 --outFileNameHeatmap correlation_plots/${region}-rf-heatmap.png --outFileNameScatter correlation_plots/${region}-rf-scatter.png --threads 6 --method pearson
 
 ####### END FIRST SCRIPT HERE #####################
 
 ####### BEGIN NEXT SCRIPT HERE ################## 
-
-# Plot correlation of uncorrected matrices at restriction fragment resolution
-hicCorrelate --matrices *rf-norm.h5 --outFileNameHeatmap ${region}-rf-heatmap.png --outFileNameScatter ${region}-rf-scatter.png --threads 6 --method pearson
-hicCorrelate --matrices *${nbin}000-norm.h5 --outFileNameHeatmap ${region}-${nbin}000-heatmap.png --outFileNameScatter ${region}-${nbin}000-scatter.png --threads 6 --method pearson
 
 # Merge matrices across replicates
 for sample in "${samples[@]}"; do
