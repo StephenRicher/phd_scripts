@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Edit TMPDIR to ensure sufficient space (/tmp is limited on my laptop)
+export TMPDIR=/home/stephen/x_am/RC-BB1219/stephen_test/tempfiles
+
 # Raw sequence directory
 raw_dir="/home/stephen/x_am/RC-BB1219/stephen_test/projects/hic_analysis/raw_data/"
 
@@ -8,15 +11,15 @@ genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sap
 genome_dir="/home/stephen/x_am/RC-BB1219/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
 
 # General parameters
-qc_dir="${raw_dir%/*}""/qc_logs/"
+qc_dir="${raw_dir%/*}""/../qc_logs/"
 threads="6"
 
 # Define paths to relevant bash scripts
-remove_wrapping="/home/stephen/h/phd/scripts2/remove_fasta_wrapping.sh"
-validate_fasta="/home/stephen/h/phd/scripts2/validate_fasta.py"
-digest_genome="/home/stephen/h/phd/scripts2/digest.py"
-truncate_reads="/home/stephen/h/phd/scripts2/hic_truncater.sh"
-split_fastq="/home/stephen/h/phd/scripts2/split_fastq.sh"
+remove_wrapping="/home/stephen/h/phd/scripts2/hic_scripts/remove_fasta_wrapping.sh"
+validate_fasta="/home/stephen/h/phd/scripts2/hic_scripts/validate_fasta.py"
+digest_genome="/home/stephen/h/phd/scripts2/hic_scripts/digest.py"
+truncate_reads="/home/stephen/h/phd/scripts2/hic_scripts/hic_truncate2.py"
+split_fastq="/home/stephen/h/phd/scripts2/hic_scripts/split_fastq.sh"
 
 # Bowtie2 index parameters
 bt2_dir="${genome_dir%/*}""/../bt2_index/"
@@ -48,7 +51,7 @@ mkdir -p "${genome_dir%/*}"/ "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_f
 
 # Ensure FASTA is in valid format and generate Mbo1 digest and Bowtie2 index.
 #if "${validate_fasta}" -f "${genome_dir}"; then
- # "${digest_genome}" -r "${re_recognition}" -f "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
+  #"${digest_genome}" -r "${re_recognition}" -f "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
   #bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
   #bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
 #fi
@@ -63,18 +66,18 @@ for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
            --error-rate ${error_rate} --overlap ${min_overlap} \
            --gc-content ${gc} --minimum-length ${min_length} \
            --quality-cutoff ${min_qual} --cores "${threads}" \
-           --output "${raw_dir%*/}"/${sample}-R1.trim.fq.gz --paired-output "${raw_dir%*/}"/${sample}-R4.trim.fq.gz \
-           "${raw_dir%*/}"/${sample}-R1.f*q.gz "${raw_dir%*/}"/${sample}-R4.f*q.gz > "${qc_dir%*/}"/${sample}.cutadapt.txt
+           --output "${raw_dir%*/}"/${sample}-R1-trim.fq.gz --paired-output "${raw_dir%*/}"/${sample}-R4-trim.fq.gz \
+           "${raw_dir%*/}"/${sample}-R1.fastq.gz "${raw_dir%*/}"/${sample}-R4.fastq.gz > "${qc_dir%*/}"/${sample}.cutadapt.txt
 done
 
-#fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].trim.fq.gz
+while IFS=  read -r -d $'\0' fastq; do
+  sample="${fastq##*/}"; sample="${sample%*.fq.gz}"
+  zcat -f "${fastq}" | "${truncate_reads}" -r "${re_recognition}" | gzip > "${raw_dir%*/}"/"${sample}"-trunc.fq.gz \
+    2> "${qc_dir%*/}"/"${sample}".trunc_summary.txt
+done < <(find "${raw_dir}" -type f -name "*-trim.fq.gz" -print0)
 
-#while IFS=  read -r -d $'\0' trimmed_fastq; do
-#  sample="${trimmed_fastq##*/}"; sample="${sample%*.fq.gz}"
-#  "${truncate_reads}" "${re_recognition}" "${trimmed_fastq}" 2> "${qc_dir%*/}"/"${sample}".trunc_summary.txt \
-#    | gzip > "${raw_dir%*/}"/"${sample}".trunc.fq.gz
-#done < <(find "${raw_dir}" -type f -name "*.trim.fq.gz" -print0)
-#wait
 
-"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_dir}" -t "${threads}" "${raw_dir%*/}"/*.trunc.fq.gz
+fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*-trim-trunc.fq.gz
+
+"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_dir}" -t "${threads}" "${raw_dir%*/}"/*-trim-trunc.fq.gz
 
