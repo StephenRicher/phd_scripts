@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=region_filter_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/region_filter%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/region_filter%j.err
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples/
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=06:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+
+region_script="/home/u/sr467/scripts/hic_scripts/filter_by_region.txt"
+capture_regions="/home/u/sr467/scripts/hic_scripts/capture_regions.bed"
+
+bams=( $(ls *coord_sorted.bam) )
+
+"${region_script}" "${capture_regions}" "${SLURM_CPUS_PER_TASK}" "${bams[@]}" 
+
