@@ -16,14 +16,16 @@ def positive_int(value):
     return ivalue
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--min_inward', default = 1000, type = positive_int, help = 'Specify mininum insert size for inward facing read pairs.')
-parser.add_argument('--min_outward', default = 1000, type = positive_int, help = 'Specify mininum insert size for outward facing read pairs.')
-parser.add_argument('--max_ditag', default = 1000, type = positive_int, help = 'Specify maximum ditag size for read pairs.')
+parser.add_argument('--min_inward', default = None, type = positive_int, help = 'Specify mininum insert size for inward facing read pairs.')
+parser.add_argument('--min_outward', default = None, type = positive_int, help = 'Specify mininum insert size for outward facing read pairs.')
+parser.add_argument('--max_ditag', default = None, type = positive_int, help = 'Specify maximum ditag size for read pairs.')
 parser.add_argument('file', type = argparse.FileType('r'), help = "Specify sam file.")
 args = parser.parse_args()
 
 def main():
-
+    if args.min_inward == args.min_outward == args.max_ditag == None:
+        sys.exit('No filter settings defined.')
+    
     with smart_read(args.file) as sam_file:
         for line in sam_file:
             if line.startswith("@"):
@@ -39,14 +41,17 @@ def main():
                 elif read1.optional['it:Z'] == "cis":
                     if read1.optional['fs:i'] == 0:
                         continue
-                    elif read1.optional['dt:i'] > args.max_ditag:
-                        continue
-                    elif read1.optional['or:Z'] == "Inward":
-                        if read1.optional['is:i'] < args.min_inward:
+                    if args.max_ditag is not None:
+                        if read1.optional['dt:i'] > args.max_ditag:
                             continue
+                    if read1.optional['or:Z'] == "Inward":
+                        if args.min_inward is not None:
+                            if read1.optional['is:i'] < args.min_inward:
+                                continue
                     elif read1.optional['or:Z'] == "Outward":
-                        if read1.optional['is:i'] < args.min_outward:
-                            continue
+                        if args.min_outward is not None:
+                            if read1.optional['is:i'] < args.min_outward:
+                                continue
                 sys.stdout.write(read1.print_sam())
                 sys.stdout.write(read2.print_sam())
 
