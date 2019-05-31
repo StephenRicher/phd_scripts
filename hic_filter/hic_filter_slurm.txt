@@ -19,10 +19,10 @@ module load python3
 module load samtools/1.9
 
 digest_file="/home/u/sr467/scratch/projects/genomes/GRCh38/wgs/GRCh38_primary_assembly_Mbo1_digest.txt"
-hic_filter="/home/u/sr467/scripts/hic_scripts/hic_filter/hic_filter.py"
+hic_filter="/u/u/sr467/phd/scripts2/hic_scripts/hic_filter/hic_filter.py"
 
 bams=( $(ls *name_sorted.bam) )
 
 for bam in "${bams[@]}"; do
-  mpirun samtools view "${bam}" | "${hic_filter}" -d "${digest_file}" > "${bam/.name_sorted.bam/}".filter_stats.txt &
+  mpirun samtools view "${bam}" | "${hic_filter}" -d "${digest_file}" > "${bam/name_sorted.bam/}".filter_stats.txt &
 done; wait
