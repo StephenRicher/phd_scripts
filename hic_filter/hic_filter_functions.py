@@ -29,7 +29,6 @@ def is_valid(read1, read2):
     return False
     
 def interaction_type(read1, read2):
-    """ Return true if reads do not align to same reference """
     if read1.rname != read2.rname:
         interaction = "trans"
     else:
