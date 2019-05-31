@@ -20,7 +20,7 @@ module load samtools/1.9
 region_script="/home/u/sr467/scripts/hic_scripts/filter_by_region.txt"
 capture_regions="/home/u/sr467/scripts/hic_scripts/capture_regions.bed"
 
-bams=( $(ls *coord_sorted.bam) )
+bams=( $(ls *coord_sorted.filtered.bam) )
 
-"${region_script}" "${capture_regions}" "${SLURM_CPUS_PER_TASK}" "${bams[@]}" 
+mpirun "${region_script}" "${capture_regions}" "${SLURM_CPUS_PER_TASK}" "${bams[@]}" 
 
