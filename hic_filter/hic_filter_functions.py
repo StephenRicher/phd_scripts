@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import math, sys
+import math, sys, bisect
 
 from class_validators import *
 
