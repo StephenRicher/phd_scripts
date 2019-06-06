@@ -4,7 +4,7 @@
 #SBATCH --job-name=process_bam_%j
 #SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/process_bam_%j.out
 #SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/process_bam_%j.err
-#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples_masked_2/
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples/
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -31,6 +31,7 @@ shift
 mpirun samtools fixmate -pm -@ ${threads} ${sample}.merged.bam - \
    | samtools sort -m 1G -l 0 -@ ${threads} - \
    | samtools markdup -sr -@ ${threads} - - 2> ${sample}.markdup.txt \
+   | tee ${sample}.markdup.bam \
    | samtools view -F 12 -q 15 -u -@ ${threads} \
    | samtools sort -n -m 1G -l 0 - \
    | samtools fixmate -p -@ ${threads} - - \
