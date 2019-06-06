@@ -30,8 +30,8 @@ fi
 echo ${outdir}
 
 genome="/home/u/sr467/scratch/projects/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-regions="/home/u/sr467/scripts/capture_regions.bed"
-hapcompass="/home/u/sr467/scripts/hapcompass_v0.8.2/hapcompass.jar"
-hc2vcf="/home/u/sr467/scripts/hapcompass_v0.8.2/hc2vcf.jar"
+regions="/home/u/sr467/scripts/hic_scripts/capture_regions.bed"
+hapcompass="/home/u/sr467/scripts/hic_scripts/hapcompass_v0.8.2/hapcompass.jar"
+hc2vcf="/home/u/sr467/scripts/hic_scripts/hapcompass_v0.8.2/hc2vcf.jar"
 
-mpirun /home/u/sr467/scripts/variant_calling.txt -s ${sample} -o ${outdir} -g ${genome} -r ${regions} -h ${hapcompass} -v ${hc2vcf} -t ${SLURM_CPUS_PER_TASK} "${@}"
+mpirun /home/u/sr467/scripts/hic_scripts/variant_calling.txt -s ${sample} -o ${outdir} -g ${genome} -r ${regions} -h ${hapcompass} -v ${hc2vcf} -t ${SLURM_CPUS_PER_TASK} "${@}"
