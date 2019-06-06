@@ -37,11 +37,13 @@ echo -e sample'\t'capture_region'\t'valid_hic_pairs'\t'region_length'\t'hic_pair
 
 # Split file into forward and reverse read files.
 if [ ! -f "${outdir}"/${sample}.R1.bam ]; then
-    samtools view -f 0x40 -b ${file} > "${outdir}"/${sample}.R1.bam &
+  samtools view -f 0x40 -u ${file} \
+  | samtools sort -n - > "${outdir}"/${sample}.R1.bam
 fi
 
 if [ ! -f "${outdir}"/${sample}.R2.bam ]; then
-    samtools view -f 0x80 -b ${file} > "${outdir}"/${sample}.R2.bam
+  samtools view -f 0x80 -u ${file} \
+  | samtools sort -n - > "${outdir}"/${sample}.R2.bam
 fi
 
 # Count total number of valid hic pairs and write to file.
