@@ -36,7 +36,7 @@ def interaction_type(read1, read2):
     return interaction
     
 def get_fragment(read, digest):
-    rf_num = bisect.bisect_left(digest[read.rname], read.middle_pos)
+    rf_num = bisect.bisect_left(digest[read.rname], read.five_prime_pos)
     rf_start = 1 if rf_num == 0 else digest[read.rname][rf_num - 1] + 1
     rf_end = digest[read.rname][rf_num]
     return fragment(rf_num, rf_start, rf_end)
