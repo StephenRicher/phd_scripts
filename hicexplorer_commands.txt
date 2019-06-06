@@ -3,20 +3,23 @@
 # Activate extended globbing
 shopt -s extglob
 
-region="DLK1_DIO3"
-location="14:99726864-102563452"
-#region="GNG12_AS1_DIRAS3"
-#location="1:67432288-68602987" # GNG12 position
+region="TET1"
+location="10:66560359:70694482"
 
-track_config="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_genome_split.ini"
-#track_config="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track.ini"
+#region="DLK1_DIO3"
+#location="14:99726864-102563452"
+region="GNG12_AS1_DIRAS3"
+location="1:67432288-68602987" # GNG12 position
+
+#track_config="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_genome_split.ini"
+track_config="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track.ini"
 #track_config_replicate="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_replicate.ini"
 
-nbin=50
 
-# Remove sample list array and remove any excluded
-samples=("HB2_CL4_G1" "HB2_CL4_G2" "HB2_WT_G1" "HB2_WT_G2" "MCF7_G1" "MCF7_G2")
-#samples=("HB2_CL4" "HB2_WT" "MCF7")
+####### BEGIN NEXT SCRIPT HERE ################## 
+
+dir="."
+samples=("HB2_CL4" "HB2_WT" "MCF7")
 
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
 delete=()
@@ -44,108 +47,66 @@ for target in "${delete[@]}"; do
   done
 done
 
-# Of the retained samples, normalise the rf and 1000 bin size matrices seperately.
-for bin in rf 1000; do
-  # Find all matrices that match kept samples.
-  matrices=()
-  for sample in "${samples[@]}"; do
-    while IFS=  read -r -d $'\0'; do
-      matrices+=("$REPLY")
-    done < <(find ./"${bin}" -type f -name "${sample}*-"${bin}".h5" -print0)
-  done
-  matrices_norm=("${matrices[@]/.h5/-norm.h5}")
-  hicNormalize --matrices "${matrices[@]}" --outFileName "${matrices_norm[@]}" --normalize smallest
-done
-# Note matrices_norm is defined for 1000 bin size matrices after for loop.
+nbin=3000
 
-# Merge matrices at varying bin sizes and generate diagnostic plots to view bin read count distribution.
-mkdir -p correlation_plots diagnostic_plots
-for i in $(seq 1000 1000 20000) $(seq 30000 10000 100000) $(seq 120000 20000 200000); do
-  mkdir -p "${i}"
-  for matrix in "${matrices_norm[@]}"; do
-    matrix_rmpath="${matrix##*/}"; matrix_rmpath="${matrix_rmpath/'-1000-'/-${i}-}"
-    if [[ "${i}" != "1000" ]]; then
-      hicMergeMatrixBins --matrix "${matrix}" --numBins $((${i}/1000)) --outFileName "${i}"/"${matrix_rmpath}"
-    fi
-    hicCorrectMatrix diagnostic_plot --matrix "${i}"/"${matrix_rmpath}" -o diagnostic_plots/${matrix_rmpath%.h5}_diagnostic.png
-  done
-  hicCorrelate --matrices "${i}"*-norm.h5 --outFileNameHeatmap correlation_plots/${region}-"${i}"-heatmap.png --outFileNameScatter ${region}-"${i}"-scatter.png --threads 6 --method pearson
-done
-hicCorrelate --matrices rf/*-norm.h5 --outFileNameHeatmap correlation_plots/${region}-rf-heatmap.png --outFileNameScatter correlation_plots/${region}-rf-scatter.png --threads 6 --method pearson
-
-####### END FIRST SCRIPT HERE #####################
-
-####### BEGIN NEXT SCRIPT HERE ################## 
-
-# Merge matrices across replicates
+# Merge replicate samples
 for sample in "${samples[@]}"; do
-   for bin in ${nbin} 10; do
-      hicSumMatrices --matrices ${sample}*${region}*${bin}000-norm.h5 --outFileName ${sample}-${region}-${bin}000-norm_sum.h5
-   done
-   hicSumMatrices --matrices ${sample}*${region}*rf-norm.h5 --outFileName ${sample}-${region}-rf-norm_sum.h5
+  hicSumMatrices --matrices "${dir}"/"${nbin}"/"${sample}"*-norm.h5 --outFileName "${dir}"/"${nbin}"/"${sample}"-"${region}"-"${nbin}"-norm_sum.h5
 done
 
-# Correct all matrixes (except the initial unmerged 1000bp bin matrices)
-mkdir diagnostic_plots
-for matrix in *${region}*{${nbin}000,rf,10000}-norm*(_sum).h5; do
-  hicCorrectMatrix diagnostic_plot --matrix ${matrix} -o diagnostic_plots/${matrix%.h5}_diagnostic.png 2> diagnostic_temp.txt
+# Correct merged and unmerged matrices
+for matrix in "${dir}"/"${nbin}"/*-norm*(_sum).h5; do
+  hicCorrectMatrix diagnostic_plot --matrix ${matrix} -o diagnostic_plot_temp.png 2> diagnostic_temp.txt
   lower_threshold=$(grep "mad threshold" diagnostic_temp.txt | awk '{print $NF}')
-  echo $lower_threshold
-  hicCorrectMatrix correct --matrix ${matrix} --filterThreshold ${lower_threshold} 4 --outFileName ${matrix%.h5}_correct.h5
-  rm diagnostic_temp.txt
-
+  hicCorrectMatrix correct --matrix "${matrix}" --correctionMethod ICE --iterNum 1000 \
+    --filterThreshold ${lower_threshold} 5 --outFileName "${matrix%.h5}"_iced.h5
+  rm diagnostic_temp.txt diagnostic_plot_temp.png
 done
 
-mkdir viewpoint
-ref="1:67831302-67832302"
-start_end=${ref/*:/}
-length=200000
-view_region=${ref/:*/}:$((${start_end/-*/}-${length}))-$((${start_end/*-/}+${length}))
-
-hicPlotViewpoint --matrix *${region}*${nbin}000-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-${nbin}000.bed --outFileName viewpoint/${region}-${nbin}000.png --dpi 300
-hicPlotViewpoint --matrix *${region}*10000-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-10000.bed --outFileName viewpoint/${region}-10000.png --dpi 300
-hicPlotViewpoint --matrix *${region}*rf-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-rf.bed --outFileName viewpoint/${region}-rf.png --dpi 300
-
-# NOTE REMOVED --vMin -4 --vMax 4 from both hicplotmatrix below
-# Compare all corrected merged matrices with each other
-mkdir matrix_comparison
-for matrix1 in *${region}*${nbin}000-norm_sum_correct.h5; do
-  for matrix2 in *${region}*${nbin}000-norm_sum_correct.h5; do
+mkdir -p "${dir}"/"${nbin}"/matrix_comparison/
+for matrix1 in "${dir}"/"${nbin}"/*-norm_sum_iced.h5; do
+  for matrix2 in "${dir}"/"${nbin}"/*-norm_sum_iced.h5; do
+    matrix1_rmpath="${matrix1##*/}"
+    matrix2_rmpath="${matrix2##*/}"
     if [ "${matrix1}" != "${matrix2}" ]; then
-      hicCompareMatrices --matrices ${matrix1} ${matrix2} \
-                         --outFileName matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_log2.h5 \
+      # order sample names to ensure we dont duplicate checks (e.g. a vs. b and b vs. a)
+      sample_ordered=$(sort <(printf "${matrix1_rmpath/-norm*}\n${matrix2_rmpath/-norm*}") | tr '\r\n' '_')
+      out="${dir}"/"${nbin}"/matrix_comparison/"${sample_ordered}"log2
+      if [ ! -f "${out}".h5 ]; then
+        hicCompareMatrices --matrices ${matrix1} ${matrix2} \
+                         --outFileName "${out}".h5 \
                          --operation log2ratio
-      hicPlotMatrix --matrix matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_log2.h5 \
-                    --outFileName matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_log2.png \
+        hicPlotMatrix --matrix "${out}".h5 \
+                    --outFileName "${out}".png \
                     --clearMaskedBins --region ${location} --dpi 300 \
-                    --title ${matrix1/-norm*}_vs_${matrix2/-norm*}_log2
+                    --title ${matrix1_rmpath/-norm*}_vs_${matrix2_rmpath/-norm*}_log2
+      fi
     fi
   done
 done
 
-# NOTE REMOVED --vMin -4 --vMax 4 from both hicplotmatrix below
-# Compare all replicates with each other
 for sample in "${samples[@]}"; do
-  matrix1="${sample}"-1-${region}"-"${nbin}"000-norm_correct.h5
-  matrix2="${sample}"-2-${region}"-"${nbin}"000-norm_correct.h5
-  hicCompareMatrices --matrices "${matrix1}" "${matrix2}" \
-                         --outFileName matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_replicate_log2.h5 \
-                         --operation log2ratio
-  hicPlotMatrix --matrix matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_replicate_log2.h5 \
-                    --outFileName matrix_comparison/${matrix1/-norm*}_vs_${matrix2/-norm*}_replicate_log2.png \
-                    --clearMaskedBins --region ${location} --dpi 300 \
-                    --title ${matrix1/-norm*}_vs_${matrix2/-norm*}_replicate_log2
+  hicCompareMatrices --matrices "${dir}"/"${nbin}"/"${sample}"*-norm_iced.h5 \
+                     --outFileName "${dir}"/"${nbin}"/matrix_comparison/"${sample}"-"${region}"_replicate_log2.h5 \
+                     --operation log2ratio
+  hicPlotMatrix --matrix "${dir}"/"${nbin}"/matrix_comparison/"${sample}"-"${region}"_replicate_log2.h5 \
+                --outFileName "${dir}"/"${nbin}"/matrix_comparison/"${sample}"-"${region}"_replicate_log2.png \
+                --clearMaskedBins --region ${location} --dpi 300 \
+                --title "${sample}"-"${region}"_replicate_log2
 done
 
 # Perform loop detection on unmerged and summed HiC matrices and plot. If no loops detected then run without the loops
-mkdir hic_plots
+mkdir "${dir}"/"${nbin}"/hic_plots
 
 # Define vMax for standardised colour scales in hicPlots - different vMax for summed and not summed matrices
-vMax_sum=$(hicInfo --matrices *${region}*${nbin}000-norm_sum_correct.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
-vMax_not_sum=$(hicInfo --matrices *${region}*${nbin}000-norm_correct.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
+vMax_sum=$(hicInfo --matrices "${dir}"/"${nbin}"/*-norm_sum_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
+vMax_not_sum=$(hicInfo --matrices "${dir}"/"${nbin}"/*-norm_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
 
-for matrix in *${region}*@(rf|${nbin}000|10000)-norm_?(sum_)correct.h5; do
-  hicDetectLoops --matrix ${matrix} -o ${matrix/.h5}_loops.bedgraph \
+
+for matrix in "${dir}"/"${nbin}"/*-norm_?(sum_)iced.h5; do
+  matrix_rmpath="${matrix##*/}"
+  loops_file="${dir}"/"${nbin}"/hic_plots/${matrix_rmpath/.h5}_loops.bedgraph
+  hicDetectLoops --matrix ${matrix} -o "${loops_file}" \
                  --maxLoopDistance 2000000 --windowSize 10 --peakWidth 6 \
                  --pValuePreselection 0.05 --pValue 0.5 --peakInteractionsThreshold 20
 
@@ -155,22 +116,115 @@ for matrix in *${region}*@(rf|${nbin}000|10000)-norm_?(sum_)correct.h5; do
     vMax=${vMax_not_sum}
   fi
 
-  if [ -f ${matrix/.h5}_loops.bedgraph ]; then
-    hicPlotMatrix --matrix ${matrix} --outFileName hic_plots/${matrix/.h5}.png \
-                --log1p --region ${location} --loops ${matrix/.h5}_loops.bedgraph \
+  if [ -f "${loops_file}" ]; then
+    hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${nbin}"/hic_plots/${matrix_rmpath/.h5}.png \
+                --log1p --region ${location} --loops "${loops_file}" \
                 --title ${matrix/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
   else
-     hicPlotMatrix --matrix ${matrix} --outFileName hic_plots/${matrix/.h5}.png \
+     hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${nbin}"/hic_plots/${matrix_rmpath/.h5}.png \
                 --log1p --region ${location} \
                 --title ${matrix/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
   fi
 done
 
-# Merge HiC plots
-for bin in rf ${nbin}000 10000; do
-   montage hic_plots/*${bin}-norm_correct.png -geometry 1200x1200+1+1 -tile 2x hic_plots/${region}_${bin}_hic_plots.png
-   montage hic_plots/*${bin}-norm_sum_correct.png -geometry 1200x1200+1+1 -tile x1 hic_plots/${region}-${bin}-sum_hic_plots.png
+montage "${dir}"/"${nbin}"/hic_plots/*-norm_iced.png -geometry 1200x1200+1+1 -tile 2x "${dir}"/"${nbin}"/hic_plots/${region}_${nbin}_hic_plots.png
+montage "${dir}"/"${nbin}"/hic_plots/*-norm_sum_iced.png -geometry 1200x1200+1+1 -tile x1 "${dir}"/"${nbin}"/hic_plots/${region}-${nbin}-sum_hic_plots.png
+
+mkdir "${dir}"/"${nbin}"/tads
+mkdir "${dir}"/"${nbin}"/tad_plots
+for delta in 0.001 0.005 0.01 0.05; do
+  for threshold in 0.001 0.005 0.01 0.05; do
+
+    # Detect TADS from both summed and unsummed restriction fragment resolution and merged resolution HiC matrices
+    for matrix in "${dir}"/"${nbin}"/*-norm_?(sum_)iced.h5; do
+      matrix_rmpath="${matrix##*/}"
+      hicFindTADs --matrix "${matrix}" --outPrefix "${dir}"/"${nbin}"/tads/${matrix_rmpath/-norm_*iced.h5}-TADS_d_${delta}_t_${threshold} \
+                  --correctForMultipleTesting fdr --thresholdComparisons ${threshold} --delta ${delta}
+    done
+
+    #for track in "${track_config}" "${track_config_replicate}"; do
+    for track in "${track_config}"; do
+      
+      temp_track="${dir}"/"${nbin}"/tad_plots/"${track##*/}"_temp.ini
+
+      sed "s/-region-/-${region}-/g" ${track} > "${temp_track}"
+      sed -i "s/-binsize-/-${nbin}-/g" "${temp_track}"
+      sed -i "s/d_delta_t_threshold/d_${delta}_t_${threshold}/g" "${temp_track}"
+      sed -i "s/-binsize-/-${nbin}-/g" "${temp_track}"
+      sed -i "s/directory/"${dir}"\/"${nbin}"/g" "${temp_track}"
+
+      for target in "${delete[@]}"; do
+        sed -i "/Start "${target}"/,/End "${target}"/d" "${temp_track}"
+      done
+
+      if [ "${track}" == "${track_config_replicate}" ]; then
+        plotname="${dir}"/"${nbin}"/tad_plots/${region}_replicate_${nbin}_d_${delta}_t_${threshold}.png
+      else
+        plotname="${dir}"/"${nbin}"/tad_plots/${region}_${nbin}_d_${delta}_t_${threshold}.png
+      fi
+
+      # Plot track first to identifiy max HiC value across all HiC matrices.
+      hicPlotTADs --tracks "${temp_track}" --region ${location} --outFileName "${plotname}" --dpi 300 2> "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt
+
+      # Extract max value from hicPlotTADs outut and insert to new temp track.ini file.
+      max_hic_value=$(grep "max values for track" "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt | awk '{print $NF}' | sort -nr | head -n 1)
+      sed -i "s/#max_value = none/max_value = ${max_hic_value}/g" "${temp_track}"
+        
+      # Replot the graph.
+      hicPlotTADs --tracks "${temp_track}" --region ${location} --outFileName "${plotname}" --title ${region}_delta_${delta}_threshold_${threshold} --dpi 300 
+    done
+  done
 done
+# Remove temporary files
+rm "${temp_track}" "${dir}"/"${nbin}"/tad_plots/${track%.*}_plot_log_temp.txt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 mkdir tads
 mkdir tad_plots
@@ -220,4 +274,16 @@ for res in ${nbin}000 rf ; do
 done; wait
 # Remove temporary files
 rm ${track%.*}_temp.ini ${track%.*}_plot_log_temp.txt
+
+
+
+mkdir viewpoint
+ref="1:67831302-67832302"
+start_end=${ref/*:/}
+length=200000
+view_region=${ref/:*/}:$((${start_end/-*/}-${length}))-$((${start_end/*-/}+${length}))
+
+hicPlotViewpoint --matrix *${region}*${nbin}000-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-${nbin}000.bed --outFileName viewpoint/${region}-${nbin}000.png --dpi 300
+hicPlotViewpoint --matrix *${region}*10000-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-10000.bed --outFileName viewpoint/${region}-10000.png --dpi 300
+hicPlotViewpoint --matrix *${region}*rf-norm_sum_correct.h5 --region ${view_region} --referencePoint ${ref} --interactionOutFileName viewpoint/${region}-rf.bed --outFileName viewpoint/${region}-rf.png --dpi 300
 
