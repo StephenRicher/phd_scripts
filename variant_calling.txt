@@ -39,7 +39,7 @@ samtools merge -@ ${threads} ${out}/${sample}.replicate_merge.bam "${@}"
 samtools index -@ ${threads} ${out}/${sample}.replicate_merge.bam
 
 # Call variants from merged sample file and quality filter.
-bcftools mpileup --ignore-RG --count-orphans -Ou --max-depth 100000 -f ${genome} --regions-file ${regions} ${out}/${sample}.replicate_merge.bam |
+bcftools mpileup -q 15 --ignore-RG --count-orphans -Ou --max-depth 100000 -f ${genome} --regions-file ${regions} ${out}/${sample}.replicate_merge.bam |
   bcftools call --skip-variants indels --multiallelic-caller --variants-only -Ou |
   bcftools view -i '%QUAL>=20' -Ou |
   bcftools sort -Oz -o ${sub}/${sample}.sorted.vcf.gz
