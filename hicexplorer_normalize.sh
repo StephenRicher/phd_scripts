@@ -3,16 +3,18 @@
 # Activate extended globbing
 shopt -s extglob
 
-#region="TET1"
-region="GNG12-AS1-DIRAS"
-location="1:67432288-68602987" # GNG12 position
-dir="."
-track_config="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track.ini"
-track_config_replicate="/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_replicate.ini"
+region="${1}"
+location="${2}":"${3}"-"${4}"
+dir="${5}"
 
-# Remove sample list array and remove any excluded
-#samples=("HB2_CL4_G1" "HB2_CL4_G2" "HB2_WT_G1" "HB2_WT_G2" "MCF7_G1" "MCF7_G2")
-samples=("HB2_CL4" "HB2_WT" "MCF7")
+if [[ "${6}" == "allele" ]]; then
+  tracks=("/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_genome_split.ini")
+  samples=("HB2_CL4_G1" "HB2_CL4_G2" "HB2_WT_G1" "HB2_WT_G2" "MCF7_G1" "MCF7_G2")
+else
+  samples=("HB2_CL4" "HB2_WT" "MCF7")
+  tracks=("/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track.ini" \
+          "/home/stephen/x_am/RC-BB1219/stephen/projects/hic_analysis/hicexplorer_tracks/hic_track_replicate.ini")
+fi
 
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
 delete=()
@@ -162,8 +164,7 @@ for nbin in rf $(seq 1000 1000 20000) $(seq 30000 10000 50000); do
                     --correctForMultipleTesting fdr --thresholdComparisons ${threshold} --delta ${delta}
       done
 
-      #for track in "${track_config}" "${track_config_replicate}"; do
-      for track in "${track_config}" "${track_config_replicate}"; do
+      for track in "${tracks[@]}"; do
       
         plot_track="${dir}"/"${nbin}"/tad_plots/tracks/"${track##*/}"-"${region}"-d_${delta}_t_${threshold}.ini
 
@@ -178,7 +179,7 @@ for nbin in rf $(seq 1000 1000 20000) $(seq 30000 10000 50000); do
           sed -i "/Start "${target}"/,/End "${target}"/d" "${plot_track}"
         done
 
-        if [ "${track}" == "${track_config_replicate}" ]; then
+        if [[ "${track}" == *"replicate"* ]]; then
           plotname="${dir}"/"${nbin}"/tad_plots/${region}_replicate_${nbin}_d_${delta}_t_${threshold}.png
         else
           plotname="${dir}"/"${nbin}"/tad_plots/${region}_${nbin}_d_${delta}_t_${threshold}.png
