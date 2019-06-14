@@ -7,6 +7,7 @@ hicup_to_hicexplorer="/home/stephen/h/phd/scripts2/hic_scripts/hicup_to_hicexplo
 hicexplorer_normalize="/home/stephen/phd/scripts/hicexplorer_normalize.sh"
 capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
 genome="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+hicexplorer_normalize="/home/stephen/h/phd/scripts2/hic_scripts/hicexplorer_normalize.sh"
 
 for bam in "${@}"; do
   (
@@ -18,8 +19,8 @@ for bam in "${@}"; do
 done; wait
 
 # Remove all header from all_samples file and add 1 to the top of the file.
-#cat <(head -n 1 all_samples.hic_info_sampled.txt) <(grep -vP "sample\torientation" all_samples.hic_info_sampled.txt) > all_samples.hic_info_sampled.tmp.txt
-#mv all_samples.hic_info_sampled.tmp.txt all_samples.hic_info_sampled.txt
+cat <(head -n 1 all_samples.hic_info_sampled.txt) <(grep -vP "sample\torientation" all_samples.hic_info_sampled.txt) > all_samples.hic_info_sampled.tmp.txt
+mv all_samples.hic_info_sampled.tmp.txt all_samples.hic_info_sampled.txt
 
 for bam in "${@}"; do
   sample="${bam%%.*}"; sample="${sample##*/}"
@@ -50,7 +51,7 @@ fi
 count=0
 for bam in *filtered-sort.bam; do
   ((count++))
-  "${hicup_to_hicexplorer}" -f "${bam}" -c "${capture_regions}" -t 6 -o "${hcx_dir}" -d "${hcx_dir}"/"${genome_nopath%.*}"_"${enzyme}"_rest_site.bed
+  "${hicup_to_hicexplorer}" -f "${bam}" -c "${capture_regions}" -t 3 -o "${hcx_dir}" -d "${hcx_dir}"/"${genome_nopath%.*}"_"${enzyme}"_rest_site.bed
 
   # Combine all summary files. If first in loop then include header.
   if [ "${count}" -eq "1" ]; then
@@ -60,8 +61,8 @@ for bam in *filtered-sort.bam; do
   fi
 done
 
-hicexplorer_normalize="/home/stephen/phd/scripts/hicexplorer_normalize.sh"
-n=6
+
+n=3
 while IFS=$'\t' read -r chr start end region; do
   ((i=i%n)); ((i++==0)) && wait
   "${hicexplorer_normalize}" "${region}" "${chr}" "${start}" "${end}" "${hcx_dir}"/all_regions/"${region}" "allele" &
