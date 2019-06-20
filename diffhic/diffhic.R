@@ -14,8 +14,8 @@ chromosome = capture_regions[capture_regions$region == region, "chromosome"]
 start = capture_regions[capture_regions$region == region, "start"]
 end = capture_regions[capture_regions$region == region, "end"]
 location = paste(chromosome, start+1, end, sep = "-")
-
-setwd(paste("/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/post_alignment/diffhic/", region, sep = ""))
+path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/post_alignment/diffhic/"
+setwd(paste(path, region, sep = ""))
 
 # Generate restriction digest
 genome = paste("Homo_sapiens.GRCh38.dna.primary_assembly.", region, "-", location, ".fa", sep = "")
@@ -27,13 +27,15 @@ for (sample in samples) {
   bam = paste(sample, ".", region, ".bam", sep = "")
   matrix = paste(sample, ".h5", sep = "")
   matrix_trim = paste(sample, "-trim.h5", sep = "")
-  sample_diagnostics = preparePairs(bam, hs.param, file = matrix, 
+  if (!file.exists(matrix_trim)) {
+    sample_diagnostics = preparePairs(bam, hs.param, file = matrix, 
                                     dedup = TRUE, minq = 20)
-  prunePairs(matrix, hs.param, file.out = matrix_trim)
-  print(paste(sample,sample_diagnostics))
+    prunePairs(matrix, hs.param, file.out = matrix_trim)
+    print(paste(sample,sample_diagnostics))
+  }
 }
 
-bin.size = 5000
+bin.size = 10000
 
 data <- squareCounts(paste(samples, "-trim.h5", sep = ""), hs.param, filter = 0, width = bin.size)
 
@@ -48,12 +50,6 @@ summary(count.keep)
 # Remove diagonal
 ndiag.keep <- filterDiag(data)
 summary(ndiag.keep)
-
-margin.data <- marginCounts(input, hs.param, width = bin.size)
-#margin.data
-
-adjc <- cpm(asDGEList(margin.data), log = TRUE, prior.count = 1)
-smoothScatter(0.5*(adjc[,3]+adjc[,4]), adjc[,3]-adjc[,4],xlab="A", ylab="M", main="HB2_WT(1) vs. MCF7(1)")
 
 trended <- filterTrended(data)
 smoothScatter(trended$log.distance, trended$abundances,xlab="Log-Distance", ylab="Normalized abundance")
@@ -73,7 +69,7 @@ data <- data[trend.keep & ndiag.keep & count.keep,]
 ab <- aveLogCPM(asDGEList(data))
 o <- order(ab)
 adj.counts <- cpm(asDGEList(data), log = TRUE)
-mval <- adj.counts[,3] - adj.counts[,4]
+mval <- adj.counts[,1] - adj.counts[,3]
 smoothScatter(ab, mval, xlab="A", ylab="M", main="KO (1) vs. Flox (2)")
 fit <- loessFit(x=ab, y=mval)
 lines(ab[o], fit$fitted[o], col="red")
@@ -84,7 +80,7 @@ nb.off <- assay(data, "offset")
 ab <- aveLogCPM(asDGEList(data))
 o <- order(ab)
 adj.counts <- log2(assay(data) + 0.5) - nb.off/log(2)
-mval <- adj.counts[,1]-adj.counts[,3]
+mval <- adj.counts[,1]-adj.counts[,4]
 smoothScatter(ab, mval, xlab="A", ylab="M", main="KO (1) vs. Flox (2)")
 fit <- loessFit(x=ab, y=mval)
 lines(ab[o], fit$fitted[o], col="red")     
@@ -95,8 +91,6 @@ lines(ab[o], fit$fitted[o], col="red")
 design <- model.matrix(~factor(c("HB2_WT","HB2_WT","HB2_CL4", "HB2_CL4", "MCF7", "MCF7"),
                                levels = c("HB2_WT", "HB2_CL4", "MCF7")))
 colnames(design) <- c("intercept", "HB2_CL4", "MCF7")
-
-
 
 # Convert to DGEList for edgeR
 y <- asDGEList(data)
@@ -127,28 +121,25 @@ for (coef in c(2, 3)) {
   results.d[,c("start2", "end2","start1", "end1")] = results.d[,c("start2", "end2","start1", "end1")] + start
   arc=results.d[,c("seqnames2","start2", "end2", "seqnames1","start1", "end1", "logFC")]
   
-  write.table(arc[arc$logFC < 0 & abs(arc$logFC) > 2,], file = paste(region, "_HB2_WT-vs-", comp, "_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
+  write.table(arc[arc$logFC < -2,], file = paste(region, "_HB2_WT-vs-", comp, "_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
               row.names = FALSE, col.names = FALSE)
-  write.table(arc[arc$logFC > 0 & abs(arc$logFC) > 2,], file = paste(region, "_HB2_WT-vs-", comp, "_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
+  write.table(arc[arc$logFC > 2,], file = paste(region, "_HB2_WT-vs-", comp, "_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
               row.names = FALSE, col.names = FALSE)
 }
 
 
-#hicPlotTADs --tracks hic_track_GNG12-AS1-WT_vs_CL4.ini --region 1:65834316-70234314 -o GNG12-AS1_HB2_WT_vs_HB2_CL4.png
-#hicPlotTADs --tracks hic_track_GNG12-AS1-WT_vs_MCF7.ini --region 1:65834316-70234314 -o GNG12-AS1_HB2_WT_vs_MCF7.png
+hicPlotTADs = "/home/stephen/miniconda3/bin/hicPlotTADs"
+
+HB2_WT_vs_HB2_CL4_template.ini = paste(path, "pygenome_track_configs/hic_track_template_HB2_WT_vs_HB2_CL4.ini", sep = "")
+HB2_WT_vs_HB2_CL4.ini = paste(path, "pygenome_track_configs/HB2_WT_vs_HB2_CL4-", region, "-", bin.size, ".ini", sep = "")
+system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", HB2_WT_vs_HB2_CL4_template.ini, " > ", HB2_WT_vs_HB2_CL4.ini, sep = ""))
+system(paste(hicPlotTADs, " --tracks ", HB2_WT_vs_HB2_CL4.ini, " --region ", chromosome, ":", start, "-", end, " -o ", region, "_HB2_WT_vs_HB2_CL4.png", sep = ""))
 
 
-
-#hicPlotTADs --tracks hic_track_TET1-WT_vs_CL4.ini --region 10:66560360-70694482 -o TET1_HB2_WT_vs_HB2_CL4.png
-#hicPlotTADs --tracks hic_track_TET1_vs_MCF7.ini --region 10:66560360-70694482 -o TET1_HB2_WT_vs_MCF7.png
-
-
-
-
-
-
-
-
+HB2_WT_vs_MCF7_template.ini = paste(path, "pygenome_track_configs/hic_track_template_HB2_WT_vs_MCF7.ini", sep = "")
+HB2_WT_vs_MCF7.ini = paste(path, "pygenome_track_configs/HB2_WT_vs_MCF7-", region, "-", bin.size, ".ini", sep = "")
+system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", HB2_WT_vs_MCF7_template.ini, " > ", HB2_WT_vs_MCF7.ini, sep = ""))
+system(paste(hicPlotTADs, " --tracks ", HB2_WT_vs_MCF7.ini, " --region ", chromosome, ":", start, "-", end, " -o ", region, "_HB2_WT_vs_MCF7.png", sep = ""))
 
 
 
@@ -166,24 +157,4 @@ for (coef in c(2, 3)) {
 
 
 
-x=abs(results.d$logFC)
-results.d$score = as.integer((1000-0)*((x-min(x))/(max(x)-min(x))) + 0)
-a = data.frame(paste("chr", results.d[o.d, c("seqnames1")], sep = ""),
-               do.call(pmin, results.d[o.d, c("start1", "start2")]),
-               do.call(pmax, results.d[o.d, c("end1", "end2")]),
-               ".", 
-               results.d[o.d, c("score")],
-               results.d[o.d, c("logFC")],
-               ".", "0",
-               paste("chr", results.d[o.d, c("seqnames1")], sep = ""),
-               do.call(pmin, results.d[o.d, c("start1", "start2")]),
-               do.call(pmin, results.d[o.d, c("end1", "end2")]),
-               ".", ".",
-               paste("chr", results.d[o.d, c("seqnames2")], sep = ""),
-               do.call(pmax, results.d[o.d, c("start1", "start2")]),
-               do.call(pmax, results.d[o.d, c("end1", "end2")]),
-               ".", ".")
-colnames(a) = c("track type=interact name=\"interact Example Two\" description=\"Chromatin interactions\" useScore=on maxHeightPixels=50:100:200 visibility=full",
-                rep("", ncol(a)-1))
-write.table(a, file = "HB2_WT_vs_HB2_CL4.tsv", sep = "\t",quote = FALSE, 
-            row.names = FALSE, col.names = TRUE)
+
