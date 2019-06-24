@@ -35,8 +35,6 @@ if (dir == ".") {
   dir = "./"
 }
 
-
-
 twonsd = read.table(args[1], sep = '\t', col.names = c("sample", "region", "binsize", "twodnSE"))
 twonsd$sample = sapply(strsplit(as.character(twonsd$sample), "-"), `[`, 1)
 
