@@ -129,15 +129,16 @@ for (coef in c(2, 3)) {
 
 
 hicPlotTADs = "/home/stephen/miniconda3/bin/hicPlotTADs"
-
-HB2_WT_vs_HB2_CL4_template.ini = paste(path, "pygenome_track_configs/hic_track_template_HB2_WT_vs_HB2_CL4.ini", sep = "")
-HB2_WT_vs_HB2_CL4.ini = paste(path, "pygenome_track_configs/HB2_WT_vs_HB2_CL4-", region, "-", bin.size, ".ini", sep = "")
+track_template_path = "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/"
+  
+HB2_WT_vs_HB2_CL4_template.ini = paste(track_template_path, "diffhic_HB2_WTvsHB2_CL4.ini", sep = "")
+HB2_WT_vs_HB2_CL4.ini = paste(path, "HB2_WT_vs_HB2_CL4-", region, "-", bin.size, ".ini", sep = "")
 system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", HB2_WT_vs_HB2_CL4_template.ini, " > ", HB2_WT_vs_HB2_CL4.ini, sep = ""))
 system(paste(hicPlotTADs, " --tracks ", HB2_WT_vs_HB2_CL4.ini, " --region ", chromosome, ":", start, "-", end, " -o ", region, "_HB2_WT_vs_HB2_CL4.png", sep = ""))
 
 
-HB2_WT_vs_MCF7_template.ini = paste(path, "pygenome_track_configs/hic_track_template_HB2_WT_vs_MCF7.ini", sep = "")
-HB2_WT_vs_MCF7.ini = paste(path, "pygenome_track_configs/HB2_WT_vs_MCF7-", region, "-", bin.size, ".ini", sep = "")
+HB2_WT_vs_MCF7_template.ini = paste(track_template_path, "diffhic_HB2_WTvsMCF7.ini", sep = "")
+HB2_WT_vs_MCF7.ini = paste(path, "HB2_WT_vs_MCF7-", region, "-", bin.size, ".ini", sep = "")
 system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", HB2_WT_vs_MCF7_template.ini, " > ", HB2_WT_vs_MCF7.ini, sep = ""))
 system(paste(hicPlotTADs, " --tracks ", HB2_WT_vs_MCF7.ini, " --region ", chromosome, ":", start, "-", end, " -o ", region, "_HB2_WT_vs_MCF7.png", sep = ""))
 
