@@ -10,29 +10,75 @@ outdir="${4}"
 
 shift 4
 
+dir="${outdir%/}"/diffhic/
+mkdir -p "${dir}"
+
 for bam in "${@}"; do
+
+  # Extract read ID of all trans captured regions.
+  samtools view "${bam}" -L "${capture_regions}" \
+    | grep -e "it:Z:trans" \
+    | cut -f 1 > diffhic/"${bam%%.*}".ID_trans.txt
+
+  LC_ALL=C grep -w -F -f "${bam%%.*}".ID_trans.txt  < <(samtools view "${bam}" | grep -e "it:Z:trans") \
+    | cat <(samtools view -H "${bam}") - \
+    | samtools sort -n -l 0 - \
+    | samtools view -b > diffhic/"${bam%%.*}".trans.bam
 
   while IFS=$'\t' read -r chr start end region; do
 
-    dir="${outdir%/}"/diffhic/"${region}"
-    mkdir -p "${dir}"
+    mkdir -p "${dir}"/"${region}"
 
     genome_no_path="${genome##*/}"
-    if [ ! -f "${dir}"/"${genome_no_path%.fa}"."${region}"-"${chr}"-$((start+1))-"${end}".fa ]; then
+    if [ ! -f "${dir}"/"${genome_no_path%.fa}"."${region}"-all.fa ]; then
       samtools faidx  "${genome}" "${chr}":$((start+1))-"${end}" \
       | sed '1 s/:.*$//' \
       > "${dir}"/"${genome_no_path%.fa}"."${region}"-"${chr}"-$((start+1))-"${end}".fa
+
+      # Extract list of all chromosomes (except the captured chromosome) and combine with the captured region.
+      cat "${dir}"/"${genome_no_path%.fa}"."${region}"-"${chr}"-$((start+1))-"${end}".fa \
+        <(samtools faidx -r <(grep ">" "${genome}" | awk '{print $1}' | tr -d '>' | grep -vx "${chr}") "${genome}") \
+      > "${dir}"/"${genome_no_path%.fa}"."${region}"-all.fa
     fi
 
     length=$((end-start))
 
+    # Extract only read pairs where both read and mate aligned within captured region.
     samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
      | samtools sort -n -l 0 - \
      | samtools fixmate -p - - \
      | samtools view -h -f 1 - \
-     | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" '/^@SQ/ {if($2!="SN:"chr) {next} else {$3="LN:"len}} !/^@/ {$4=$4-start+1; $8=$8-start+1} {print}' \
+     | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" '
+         /^@SQ/ {if($2!="SN:"chr) {next} else {$3="LN:"len}} 
+         !/^@/ {$4=$4-start+1; $8=$8-start+1}
+         {print}' \
      | samtools view -F 12 -b > "${dir}"/"${bam%%.*}"."${region}".bam
+
+    # Extract all trans read IDs that align within the capture region
+    samtools view "${bam}" "${chr}":$((start+1))-"${end}" \
+      | grep -e "it:Z:trans" \
+      | cut -f 1 > "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt
+
+    # Extract all read ID and corresponding trans mate that aligned within capture region.
+    LC_ALL=C grep -w -F -f "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt  < <(samtools view "${bam}" | grep -e "it:Z:trans") \
+      | cat <(samtools view -H "${bam}") - \
+      | awk -v OFS='\t' -v chr="${chr}" -v start="${start}" -v len="${length}" '
+          /^@SQ/ {if($2=="SN:"chr) {$3="LN:"len}}
+          !/^@/ {if($3==chr) {$4=$4-start+1}}
+          !/^@/ {if($7!="=") {$8=$8-start+1}}
+          {print}' \
+      | samtools sort -n -l 0 - \
+      | samtools view -b > "${dir}"/"${bam%%.*}"."${region}"_trans.bam
+
+    # Merge the captured trans and captured only reads
+    samtools merge -n -f "${dir}"/"${bam%%.*}"."${region}"_all.bam \
+      "${dir}"/"${bam%%.*}"."${region}".bam \
+      "${dir}"/"${bam%%.*}"."${region}"_trans.bam
+
+    rm "${dir}"/"${bam%%.*}"."${region}"_trans.bam \
+       "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt \
 
   done <"${capture_regions}"
 
 done
+
