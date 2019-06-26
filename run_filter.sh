@@ -19,7 +19,8 @@ for bam in "${@}"; do
 done; wait
 
 # Remove all header from all_samples file and add 1 to the top of the file.
-cat <(head -n 1 all_samples.hic_info_sampled.txt) <(grep -vP "sample\torientation" all_samples.hic_info_sampled.txt) > all_samples.hic_info_sampled.tmp.txt
+header=$(head -n 1 all_samples.hic_info_sampled.txt)
+(printf "%s\n" "$header"; grep -vFxe "${header}" all_samples.hic_info_sampled.txt) > all_samples.hic_info_sampled.tmp.txt
 mv all_samples.hic_info_sampled.tmp.txt all_samples.hic_info_sampled.txt
 
 for bam in "${@}"; do
@@ -62,12 +63,9 @@ for bam in *filtered-sort.bam; do
 done
 
 
-n=3
 while IFS=$'\t' read -r chr start end region; do
-  ((i=i%n)); ((i++==0)) && wait
-  "${hicexplorer_normalize}" "${region}" "${chr}" "${start}" "${end}" "${hcx_dir}"/all_regions/"${region}" "allele" &
-done <${capture_regions}; wait
-shutdown
+  "${hicexplorer_normalize}" "${region}" "${chr}" "${start}" "${end}" "${hcx_dir}"/all_regions/"${region}"
+done <${capture_regions}
 
 
 
