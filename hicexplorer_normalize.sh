@@ -9,10 +9,10 @@ ontad="/home/stephen/Downloads/OnTAD-master/src/OnTAD"
 plot2dnSE="/home/stephen/h/phd/scripts2/hic_scripts/plot_twodnse.R"
 
 region="${1}"
-dir="${5}"
 chr="${2}"
 start="${3}"
 end="${4}"
+dir="${5}"
 
 # Define plot region - set maximum plot region size
 max_size=1500000
@@ -31,7 +31,8 @@ if [[ "${6}" == "allele" ]]; then
   tracks=("hicexplorer_G1vsG2.ini")
 else
   samples=("HB2_WT" "HB2_CL4" "MCF7")
-  bin_range=( $(seq 1000 1000 40000) rf)
+  # Include rf to use restriction fragment resolution but may break with nested TADS.
+  bin_range=( $(seq 1000 1000 15000) )
   tracks=("/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7.ini" \
           "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_replicate.ini")
 fi
@@ -130,8 +131,8 @@ for nbin in "${bin_range[@]}"; do
       lower_threshold=$(grep "mad threshold" "${dir}"/diagnostic_plots/${matrix_rmpath%.h5}_diagnostic_log_temp.txt | awk '{print $NF}')
       hicCorrectMatrix correct --matrix "${matrix}" --correctionMethod ICE --iterNum 1000 \
                                --filterThreshold ${lower_threshold} 5 --outFileName "${matrix%.h5}"_iced.h5
-   
-      # Catch errors with ICE correct - remove sample if unsuccessful 
+
+      # Catch errors with ICE correct - remove sample if unsuccessful
       if ! hicInfo --matrices "${matrix%.h5}"_iced.h5 2>/dev/null ; then
         unset 'samples2[sample]'
         delete2+=("${sample}")
@@ -179,8 +180,8 @@ for nbin in "${bin_range[@]}"; do
   #    hitad --output "${dir}"/"${nbin}"/tads/"${sample}"_hitad.txt \
   #          --datasets "${dir}"/"${nbin}"/tads/"${sample}"_hitad_metafile.txt \
   #          --logFile "${dir}"/"${nbin}"/tads/"${sample}"_hitad_log.txt
-  #  done 
-  #fi 
+  #  done
+  #fi
 
   mkdir -p "${dir}"/"${nbin}"/matrix_comparison/
   for ((i=0; i < ${#samples2[@]}; i++)); do
@@ -193,7 +194,7 @@ for nbin in "${bin_range[@]}"; do
                   --colorMap bwr --region ${location} --dpi 300 --vMin -3 --vMax 3 \
                   --title "${sample1}"-"${region}"_replicate_log2
 
-    for ((j=i+1; j < ${#samples2[@]}; j++)); do   
+    for ((j=i+1; j < ${#samples2[@]}; j++)); do
       sample2="${samples2[j]}"
         hicCompareMatrices --matrices "${dir}"/"${nbin}"/"${sample1}"*-norm_sum_iced.h5 "${dir}"/"${nbin}"/"${sample2}"*-norm_sum_iced.h5 \
                            --outFileName "${dir}"/"${nbin}"/matrix_comparison/"${sample1}"_vs_"${sample2}"-"${region}"-"${nbin}"_log2.h5 \
@@ -216,20 +217,20 @@ for nbin in "${bin_range[@]}"; do
   # Perform loop detection on unmerged and summed HiC matrices and plot. If no loops detected then run without the loops
   mkdir "${dir}"/"${nbin}"/hic_plots
   mkdir "${dir}"/"${nbin}"/hic_plots_obs_exp
-  
+
   # Define vMax for standardised colour scales in hicPlots - different vMax for summed and not summed matrices
   vMax_sum=$(hicInfo --matrices "${dir}"/"${nbin}"/*-norm_sum_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
   vMax_not_sum=$(hicInfo --matrices "${dir}"/"${nbin}"/*-norm_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
 
   for matrix in "${dir}"/"${nbin}"/*-norm_?(sum_)iced.h5; do
-    
+
     matrix_rmpath="${matrix##*/}"
-    
+
     hicTransform -m "${matrix}" --method obs_exp -o "${dir}"/"${nbin}"/${matrix_rmpath/.h5}_obs_exp.h5
 
     loops_file="${dir}"/"${nbin}"/hic_plots/${matrix_rmpath/.h5}_loops.bedgraph
     hicDetectLoops --matrix ${matrix} -o "${loops_file}" \
-                   --maxLoopDistance 2000000 --windowSize 10 --peakWidth 6 \
+                   --minLoopDistance "${nbin}" --maxLoopDistance 1000000 --windowSize 10 --peakWidth 6 \
                    --pValuePreselection 0.05 --pValue 0.5 --peakInteractionsThreshold 20
 
     if [[ "${matrix}" == *"_sum_"* ]]; then
@@ -244,16 +245,16 @@ for nbin in "${bin_range[@]}"; do
                     --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
       hicPlotMatrix --matrix "${dir}"/"${nbin}"/${matrix_rmpath/.h5}_obs_exp.h5 \
                     --outFileName "${dir}"/"${nbin}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
-                    --colorMap PuRd --region ${location} --loops "${loops_file}" --vMin 0 \
-                    --title ${matrix_rmpath/.h5}_obs_exp --dpi 300
+                    --colorMap bwr --region ${location} --loops "${loops_file}" --vMin 0 \
+                    --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
     else
       hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${nbin}"/hic_plots/${matrix_rmpath/.h5}.png \
                     --colorMap PuRd --log1p --region ${location} \
                     --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
       hicPlotMatrix --matrix "${dir}"/"${nbin}"/${matrix_rmpath/.h5}_obs_exp.h5 \
                     --outFileName "${dir}"/"${nbin}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
-                    --colorMap PuRd --region ${location} --vMin 0 \
-                    --title ${matrix_rmpath/.h5}_obs_exp --dpi 300
+                    --colorMap bwr --region ${location} --vMin 0 \
+                    --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
     fi
   done
 
@@ -268,7 +269,7 @@ for nbin in "${bin_range[@]}"; do
   for transform in count obs_exp; do
 
     for track in "${tracks[@]}"; do
-      
+
       plot_track="${dir}"/"${nbin}"/tad_plots/tracks/"${track##*/}"-"${region}".ini
 
       sed "s/-region-/-${region}-/g" ${track} > "${plot_track}"
@@ -292,19 +293,19 @@ for nbin in "${bin_range[@]}"; do
         sed -i 's/min_value = 1/min_value = 0/g' "${plot_track}"
         sed -i 's/#colormap/colormap/g' "${plot_track}"
         sed -i '/transform = log1p/d' "${plot_track}"
-        #sed -i "s/#max_value = none/max_value = 2/g" "${plot_track}"
-      fi
-      #else
-      # Plot track first to identifiy max HiC value across all HiC matrices.
-      hicPlotTADs --tracks "${plot_track}" --region ${location} --outFileName "${plotname}" --dpi 300 2> "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt
+        sed -i "s/#max_value = none/max_value = 2/g" "${plot_track}"
+      #fi
+      else
+        # Plot track first to identifiy max HiC value across all HiC matrices.
+        hicPlotTADs --tracks "${plot_track}" --region ${location} --outFileName "${plotname}" --dpi 300 2> "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt
 
-      # Extract max value from hicPlotTADs outut and insert to new temp track.ini file.
-      max_hic_value=$(grep "max values for track" "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt | awk '{print $NF}' | sort -nr | head -n 1)
-      sed -i "s/#max_value = none/max_value = ${max_hic_value}/g" "${plot_track}"
-      #fi   
-        
+        # Extract max value from hicPlotTADs outut and insert to new temp track.ini file.
+        max_hic_value=$(grep "max values for track" "${dir}"/"${nbin}"/tad_plots/${track##*/}_plot_log_temp.txt | awk '{print $NF}' | sort -nr | head -n 1)
+        sed -i "s/#max_value = none/max_value = ${max_hic_value}/g" "${plot_track}"
+      fi
+
       # Replot the graph.
-      hicPlotTADs --tracks "${plot_track}" --region ${location} --outFileName "${plotname}" --title ${region} --dpi 300 
+      hicPlotTADs --tracks "${plot_track}" --region ${location} --outFileName "${plotname}" --title ${region} --dpi 300
     done
   done
 
