@@ -4,6 +4,59 @@ library(csaw)
 library(rhdf5)
 library(stringr)
 
+# Define directory and move to path
+path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/post_alignment/diffhic/"
+setwd(path)
+
+# Whole genome sequence - FASTA headers have been modified to ensure they only contain chromosomes.
+genome = "/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.diffhic_compatible.fa"
+hs.frag = cutGenome(genome, "GATC", 4)
+hs.param <- pairParam(hs.frag)
+
+# Samples to process.
+samples = c("HB2_WT_1", "HB2_WT_2", "HB2_CL4_1", "HB2_CL4_2", "MCF7_1", "MCF7_2")
+# Generate HiC matrix of trans interactions within capture regions.
+for (sample in samples) {
+  bam = paste(sample, ".trans.bam", sep = "")
+  matrix = paste(sample, ".trans.h5", sep = "")
+  matrix_trim = paste(sample, ".trans-trim.h5", sep = "")
+  if (!file.exists(matrix_trim)) {
+    sample_diagnostics = preparePairs(bam, hs.param, file = matrix, 
+                                      dedup = TRUE, minq = 20)
+    prunePairs(matrix, hs.param, file.out = matrix_trim)
+    print(paste(sample,sample_diagnostics))
+  }
+}
+bin.size = 1000000
+data <- squareCounts(paste(samples, ".trans-trim.h5", sep = ""), hs.param, width = bin.size)
+direct = filterDirect(data)
+direct$threshold
+
+
+a = data[!intrachr(data)]
+n.bins = as.numeric(runLength(seqnames(regions(data))))
+total.bins <- sum(n.bins)
+n.inter <- total.bins * (total.bins + 1L)/2L - sum(n.bins * (n.bins + 1L)/2L)
+
+ave.ab <- scaledAverage(data, assay.id=1, prior.count=2, scale=1)
+inter.ab = ave.ab[!intrachr(data)]
+
+prop.kept <- length(inter.ab)/n.inter
+
+
+threshold <- quantile(inter.ab, 1-0.5/prop.kept)
+ave.ab[is.na(pairdist(data, type="mid"))]
+
+
+
+
+
+
+
+
+
+
+
 capture_regions = read.csv("/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed", sep = "\t", 
                            header = FALSE, col.names = c("chromosome", "start", "end", "region"))
 
@@ -19,12 +72,14 @@ setwd(paste(path, region, sep = ""))
 
 # Generate restriction digest
 genome = paste("Homo_sapiens.GRCh38.dna.primary_assembly.", region, "-", location, ".fa", sep = "")
+#genome = paste("Homo_sapiens.GRCh38.dna.primary_assembly.", region, "-all.fa", sep = "")
 hs.frag = cutGenome(genome, "GATC", 4)
 hs.param <- pairParam(hs.frag)
 
-samples = c("HB2_WT_1", "HB2_WT_2", "HB2_CL4_1", "HB2_CL4_2", "MCF7_1", "MCF7_2")
+
 for (sample in samples) {
   bam = paste(sample, ".", region, ".bam", sep = "")
+  #bam = paste(sample, ".", region, "_all.bam", sep = "")
   matrix = paste(sample, ".h5", sep = "")
   matrix_trim = paste(sample, "-trim.h5", sep = "")
   if (!file.exists(matrix_trim)) {
@@ -35,11 +90,33 @@ for (sample in samples) {
   }
 }
 
-bin.size = 10000
+bin.size = 5000
 
-data <- squareCounts(paste(samples, "-trim.h5", sep = ""), hs.param, filter = 0, width = bin.size)
+data <- squareCounts(paste(samples, "-trim.h5", sep = ""), hs.param, width = bin.size)
+direct = filterDirect(data)
+direct$threshold
 
+
+
+
+small.keep <- direct$abundances > direct$threshold + log2(5)
+summary(small.keep)
 ## FILTERING UNINTERESTING INTERACTIONS ##
+
+for (sample in samples) {
+  #bam = paste(sample, ".", region, ".bam", sep = "")
+  bam = paste(sample, ".", region, "_all.bam", sep = "")
+  matrix = paste(sample, ".h5", sep = "")
+  matrix_trim = paste(sample, "-trim.h5", sep = "")
+  if (!file.exists(matrix_trim)) {
+    sample_diagnostics = preparePairs(bam, hs.param, file = matrix, 
+                                      dedup = TRUE, minq = 20)
+    prunePairs(matrix, hs.param, file.out = matrix_trim)
+    print(paste(sample,sample_diagnostics))
+  }
+}
+
+
 
 # Remove low abundance counts
 ave.ab <- aveLogCPM(asDGEList(data))
