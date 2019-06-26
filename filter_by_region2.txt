@@ -1,0 +1,69 @@
+#!/bin/bash
+
+capture_regions="${1}"
+
+genome="${2}"
+
+threads="${3}"
+
+outdir="${4}"
+
+shift 4
+
+dir="${outdir%/}"/diffhic
+mkdir -p "${dir}"
+
+# Remove custom genome if it exists to prevent appending to existing.
+genome_no_path="${genome##*/}"
+rm "${dir}"/"${genome_no_path%.fa}".captured_regions.fa
+
+# Create custom genome and rename FASTA header to region name.
+while IFS=$'\t' read -r chr start end region; do
+  samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
+  | sed "1 s/^.*$/>${region}/" \
+  >> "${dir}"/"${genome_no_path%.fa}".captured_regions.fa
+done <"${capture_regions}"
+
+for bam in "${@}"; do
+  ((i=i%threads)); ((i++==0)) && wait
+
+  (
+
+  # Remove custom SAM if it exists to prevent appending to existing.
+  rm "${dir}"/"${bam%%.*}".captured.sam
+
+  # Extract SAM header and remove chromosome lines
+  samtools view -H "${bam}" | grep -v "@SQ" > "${dir}"/"${bam%%.*}".custom_header.sam
+  
+  while IFS=$'\t' read -r chr start end region; do
+
+    echo Processing "${region}" in "${bam%%.*}"
+
+    length=$((end-start))
+
+    # For each region insert a modified chromosome header after line 1.
+    sed -i "2i @SQ\tSN:${region}\tLN:${length}" "${dir}"/"${bam%%.*}".custom_header.sam
+
+    # Extract only read pairs where both read and mate aligned within captured region.
+    samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
+     | samtools sort -n -l 0 - \
+     | samtools fixmate -p - - \
+     | samtools view -h -f 1 - \
+     | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" -v region="${region}" '
+         /^@SQ/ {if($2!="SN:"chr) {next} else {$2="SN:"region; $3="LN:"len}} 
+         !/^@/ {$3=region; $4=$4-start+1; $8=$8-start+1}
+         {print}' \
+     | samtools view -F 12 >> "${dir}"/"${bam%%.*}".captured.sam
+
+  done <"${capture_regions}"
+
+  cat "${dir}"/"${bam%%.*}".custom_header.sam "${dir}"/"${bam%%.*}".captured.sam \
+  | samtools view -Sb > "${dir}"/"${bam%%.*}".captured.bam
+  
+  #rm "${dir}"/"${bam%%.*}".captured.sam
+  ) &
+
+done; wait
+
+
+
