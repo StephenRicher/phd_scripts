@@ -25,16 +25,13 @@ while IFS=$'\t' read -r chr start end region; do
 done <"${capture_regions}"
 
 for bam in "${@}"; do
-  ((i=i%threads)); ((i++==0)) && wait
-
-  (
 
   # Remove custom SAM if it exists to prevent appending to existing.
   rm "${dir}"/"${bam%%.*}".captured.sam
 
   # Extract SAM header and remove chromosome lines
   samtools view -H "${bam}" | grep -v "@SQ" > "${dir}"/"${bam%%.*}".custom_header.sam
-  
+
   while IFS=$'\t' read -r chr start end region; do
 
     echo Processing "${region}" in "${bam%%.*}"
@@ -59,9 +56,9 @@ for bam in "${@}"; do
 
   cat "${dir}"/"${bam%%.*}".custom_header.sam "${dir}"/"${bam%%.*}".captured.sam \
   | samtools view -Sb > "${dir}"/"${bam%%.*}".captured.bam
-  
-  #rm "${dir}"/"${bam%%.*}".captured.sam
-  ) &
+
+  rm "${dir}"/"${bam%%.*}".captured.sam "${dir}"/"${bam%%.*}".custom_header.sam
+
 
 done; wait
 
