@@ -3,8 +3,8 @@
 import re
 
 class IntRange():
-    """ Descriptor to validate attribute format with custom
-    integer range. """
+    ''' Descriptor to validate attribute format with custom
+    integer range. '''
     
     def __init__(self, minimum, maximum):
         self.minimum = minimum
