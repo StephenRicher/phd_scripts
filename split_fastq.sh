@@ -37,7 +37,7 @@ done
 
 split_fastq() {
   shopt -s extglob
-  prefix="${3%*/}"/"${1##*/}"; prefix="${prefix%.f*q?(.gz)}".part
+  prefix="${outdir%*/}"/"${1##*/}"; prefix="${prefix%.f*q?(.gz)}".part
   zcat -f "${1}" \
     | split -l $(("${2}"*4)) --filter='gzip > "${FILE}".fq.gz' - "${prefix}"
 }
