@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 
-import argparse, contextlib, collections, bisect, time, re, sys, math
+import argparse, contextlib, collections, bisect, time, re, sys, math, logging
+
+sys.path.insert(0, '/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/')
 
 from sam_class import *
-from smart_read import *
 from hic_filter_functions import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--digest", help = "Specify digest file.")
-parser.add_argument('file', type = argparse.FileType('r'), help = "Specify sam file.")
+parser.add_argument('-f', '--file', nargs = '?', help = 'Specify sam file.', type = argparse.FileType('r'), default = sys.stdin)
+parser.add_argument('-o', '--out', nargs = '?', help = 'Specify output file name', type = argparse.FileType('w'),  default = sys.stdout)
+# Create group for required named arguments.
+requiredNamed = parser.add_argument_group('required named arguments')
+requiredNamed.add_argument('-d', '--digest', help = 'Specify digest file.', required = True)
 args = parser.parse_args()
 
 def main():
     d = process_digest(args.digest)
 
-    with smart_read(args.file) as sam_file:
+    with args.file as sam_file, args.out as out:
         for line in sam_file:
             if line.startswith("@"):
-                sys.stdout.write(line)
+                out.write(line)
                 continue
             else:
                 try:
@@ -36,8 +40,8 @@ def main():
                 read2.optional['is:i'] = insert_size
                 read1.optional['fs:i'] = fragment_seperation
                 read2.optional['fs:i'] = fragment_seperation
-                sys.stdout.write(read1.print_sam())
-                sys.stdout.write(read2.print_sam())
+                out.write(read1.print_sam())
+                out.write(read2.print_sam())
                 
 def pysam_test():
     import pysam
