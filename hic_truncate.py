@@ -1,33 +1,25 @@
 #!/usr/bin/env python3
 
-import re, argparse, sys, gzip, contextlib, os, stat, select
+import argparse, sys, re
 
-from smart_open import smart_open
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--file", help = "Specify input file name.", nargs = "?")
-parser.add_argument("-r", "--restriction", help = "Specific restriction enzyme with cut site (i.e. Mbol: ^GATC)")
-args = parser.parse_args()
-
-@contextlib.contextmanager
-def smart_read (filename):
-    """ Custom context file opener which can read from from stdin or input file."""
-    
-    if filename and filename != '-':
-        try:
-            fh = open(filename, 'rt')
-        except IOError as e:
-            sys.exit(str(e))
+def restriction_seq(value):
+    ''' Custom argparse type restriction enzyme type. '''
+    if value.count('^') != 1:
+        raise argparse.ArgumentTypeError(f'Error: Restriction site {value} must contain one "^" to indicate cut site.')
+    elif re.search('[^ATCG^]', value, re.IGNORECASE)
+        raise argparse.ArgumentTypeError(f'Error: Restriction site {value} must only contain "ATCG^".')
     else:
-        if not sys.stdin.isatty():
-            fh = sys.stdin
-        else:
-            sys.exit("Nothing in stdin and no infile provided.")
-    try:
-        yield fh
-    finally:
-        if fh not in [sys.stdin]:
-            fh.close()
+        return value
+
+parser = argparse.ArgumentParser(description = 'Script to truncate proximity ligated restriction fragments in FASTQ files.')
+parser.add_argument('-f', '--file', nargs = '?', help = 'Specify input file name.', type = argparse.FileType('r'), default = sys.stdin)
+parser.add_argument('-o', '--out', nargs = '?', help = 'Specify output file name', type = argparse.FileType('w'),  default = sys.stdout)
+parser.add_argument('-l', '--log', nargs = '?', help = 'Specify log file name', type = argparse.FileType('w'),  default = sys.stderr)
+parser.add_argument('-s', '--sample', help = 'Specify sample name.', type = str, default = None)
+# Create group for required named arguments.
+requiredNamed = parser.add_argument_group('required named arguments')
+requiredNamed.add_argument('-r', '--restrictionSite', type = restriction_seq, help = 'Specify restriction cut site (e.g. Mbo1: ^GATC).', required = True)
+args = parser.parse_args()
 
 def process_restriction(restriction):
     restriction_seq = restriction.replace('^','')
@@ -39,36 +31,35 @@ def process_restriction(restriction):
     cut_index = len(ligation1)
     return ligation_seq, restriction_seq
 
-def eprint(*args, **kwargs):
-    """ Print to stderr """
-    print(*args, file = sys.stderr, **kwargs)
-
 if __name__ == '__main__':
     if not args.file and sys.stdin.isatty():
         parser.print_help()
  
-    ligation_seq, restriction_seq = process_restriction(args.restriction)
-    total_truncated = 0
-    trunc_len_dist = {}
+    if not args.sample:
+        if args.file is not sys.stdin:
+            args.sample = args.file
+        else:
+            args.sample = 'sample'
+ 
+    ligation_seq, restriction_seq = process_restriction(args.restrictionSite)
+    truncated = 0
+    truncated_length = 0
     
-    with smart_read(args.file) as f:
-        seq_length = False
+    with args.file as f, args.out as out, args.log as log:
         for index, line in enumerate(f):
             line=line.rstrip('\n')
             # Sequence line
             if index % 4 == 1 and ligation_seq in line:
                 line = line[0: line.index(ligation_seq)] + restriction_seq
-                seq_length = len(line)
+                is_truncated = True
+            seq_length = len(line)
             # Quality line
-            elif seq_length and index % 4 == 3:
+            elif index % 4 == 3:
                 line = line[0:seq_length]
-                if seq_length in trunc_len_dist:
-                    trunc_len_dist[seq_length] += 1
-                else:
-                    trunc_len_dist[seq_length] = 1
-                total_truncated += 1
-                seq_length = False
-            print(line)
-    for length, number in trunc_len_dist.items():
-        eprint(args.file, length, number)
+                if truncated:
+                    truncated += 1
+                    truncated_length += seq_length
+                    is_truncated = False
+            out.write(f'{line}\n')
+        log.write(f'{args.sample}\t{truncated}\t{truncated_length/truncated}\n')
             
