@@ -27,7 +27,7 @@ if __name__ == '__main__':
     overhang = args.restrictionSite.index('^')
     site = args.restrictionSite.replace('^','')
 
-    with args.file as f, args.out as out:
+    with args.file as f, args.out as out, args.log as log:
         for line in f:
             line = line.rstrip('\n')
             if line.startswith('>'):
