@@ -2,36 +2,35 @@
 
 import re, argparse, sys, gzip, contextlib, os, stat, select
 
-from smart_open import smart_open
+def restriction_seq(value):
+    ''' Custom argparse type restriction enzyme type. '''
+    if value.count('^') != 1:
+        raise argparse.ArgumentTypeError(f'Error: Restriction site {value} must contain one "^" to indicate cut site.')
+    elif re.search('[^ATCG^]', value, re.IGNORECASE)
+        raise argparse.ArgumentTypeError(f'Error: Restriction site {value} must only contain "ATCG^".')
+    else:
+        return value
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--file", help = "Specify input file name.", nargs = "?")
-parser.add_argument("-o", "--out", help = "Specify output file name", nargs = "?")
-parser.add_argument("-r", "--restrictionSite", help = "Specify restriction cut site (e.g. Mbo1: ^GATC).")
+parser.add_argument('-f', '--file', nargs = '?', help = 'Specify input file name.', type = argparse.FileType('r'), default = sys.stdin)
+parser.add_argument('-o', '--out', nargs = '?', help = 'Specify output file name', type = argparse.FileType('w'),  default = sys.stdout)
+parser.add_argument('-l', '--log', nargs = '?', help = 'Specify log file name', type = argparse.FileType('w'),  default = sys.stderr)
+# Create group for required named arguments.
+requiredNamed = parser.add_argument_group('required named arguments')
+requiredNamed.add_argument('-r', '--restrictionSite', type = restriction_seq, help = 'Specify restriction cut site (e.g. Mbo1: ^GATC).', required = True)
 args = parser.parse_args()
-
-def eprint(*args, **kwargs):
-    """ Print to stderr and exit """
-    print(*args, file=sys.stderr, **kwargs)
-    sys.exit(1)
 
 if __name__ == '__main__':
     if not args.file and sys.stdin.isatty():
         parser.print_help()
-
-    if args.restrictionSite.count("^") != 1:
-        eprint("Error: Restriction site {} must contain one '^' to indicate cut site.".format(args.restrictionSite))
     
     overhang = args.restrictionSite.index('^')
     site = args.restrictionSite.replace('^','')
-    
-    if re.search("[^ATCG]", site, re.IGNORECASE):
-        eprint("Error: Restriction sequence {} must only contain ATCG.".format(site))
-    
-    with smart_open(args.file, mode = "read") as f, smart_open(args.out, mode = "write") as out:
+
+    with args.file as f, args.out as out:
         for line in f:
             line = line.rstrip('\n')
-            if line.startswith(">"):
+            if line.startswith('>'):
                 ref = line.rsplit()[0][1:]
             else:
                 matches = re.finditer(site, line)
@@ -43,6 +42,6 @@ if __name__ == '__main__':
                         index += 1
                         start = 1 if index == 1 else previous_end + 1
                         end = match.start() + overhang
-                        out.write("{}\t{}\t{}\t{}\n".format(ref, start, end, index))    
+                        out.write(f'{ref}\t{start}\t{end}\t{index}\n')    
                     previous_end = end
-                out.write("{}\t{}\t{}\t{}\n".format(ref, previous_end + 1, len(line), index + 1))
+                out.write(f'{ref}\t{previous_end + 1}\t{len(line)}\t{index + 1}\n')
