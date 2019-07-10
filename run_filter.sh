@@ -8,6 +8,20 @@ hicexplorer_normalize="/home/stephen/phd/scripts/hicexplorer_normalize.sh"
 capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
 genome="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 hicexplorer_normalize="/home/stephen/h/phd/scripts2/hic_scripts/hicexplorer_normalize.sh"
+qc_dir="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/qc_logs/"
+
+for bam in *.coord_sorted.bam; do
+  qualimap bamqc -bam "${bam}" \
+                 --genome-gc-distr HUMAN \
+                 --feature-file "${capture_regions}" \
+                 --outside-stats \
+                 -outdir "${qc_dir%*/}"/"${bam%%.*}"_bamQC \
+                 --java-mem-size=4G
+  echo -e ""${bam%%.*}"\t"${qc_dir%*/}"/"${bam%%.*}"_bamQC\t"${bam/_[12]*/}"" >> "${qc_dir%*/}"/multibamqc_config.txt
+done
+qualimap multi-bamqc --data "${qc_dir%*/}"/multibamqc_config.txt \
+                     -outdir "${qc_dir%*/}"/multi_bamQC \
+                     --java-mem-size=4G
 
 for bam in "${@}"; do
   (
