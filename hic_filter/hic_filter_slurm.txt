@@ -1,9 +1,10 @@
 #!/bin/bash
 
 #SBATCH --account=ba-fs6sdb
-#SBATCH --job-name=hic_filter_%j
-#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hic_filter_%j.out
-#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hic_filter_%j.err
+#SBATCH --array=1-6
+#SBATCH --job-name=hic_filter_%A_%a
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/hic_filter%A_%a.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/hic_filter_%A_%a.err
 #SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/all_samples/
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
@@ -18,11 +19,14 @@ module load openmpi/intel
 module load python3
 module load samtools/1.9
 
-digest_file="/home/u/sr467/scratch/projects/genomes/GRCh38/wgs/GRCh38_primary_assembly_Mbo1_digest.txt"
-hic_filter="/u/u/sr467/phd/scripts2/hic_scripts/hic_filter/hic_filter.py"
+filter_reads="/home/u/sr467/scripts/hic_scripts/hic_filter/filter_reads.py"
 
-bams=( $(ls *name_sorted.bam) )
+# Variable indirection
+bam="${!SLURM_ARRAY_TASK_ID}"
 
-for bam in "${bams[@]}"; do
-  mpirun samtools view "${bam}" | "${hic_filter}" -d "${digest_file}" > "${bam/name_sorted.bam/}".filter_stats.txt &
-done; wait
+sample="${bam%%.*}"; sample="${sample##*/}"
+echo Processing "${bam}"
+samtools view -h "${bam}"\
+  | "${filter_reads}" --min_inward 1000 --max_ditag 1000 \
+  |  samtools sort -@ 16 -m 3G > "${sample}".filtered-sort.bam
+samtools index -@ 16 "${sample}".filtered-sort.bam
