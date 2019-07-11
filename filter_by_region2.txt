@@ -1,16 +1,18 @@
 #!/bin/bash
 
+prepare_for_hic="/home/stephen/h/phd/scripts2/hic_scripts/prepare_for_hic.py"
+
 capture_regions="${1}"
 
 genome="${2}"
 
 threads="${3}"
 
-outdir="${4}"
+dir="${4}"
 
 shift 4
 
-dir="${outdir%/}"/diffhic
+# Create out directory if it does not exist
 mkdir -p "${dir}"
 
 # Remove custom genome if it exists to prevent appending to existing.
@@ -42,6 +44,17 @@ for bam in "${@}"; do
     sed -i "2i @SQ\tSN:${region}\tLN:${length}" "${dir}"/"${bam%%.*}".custom_header.sam
 
     # Extract only read pairs where both read and mate aligned within captured region.
+    #samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
+    # | samtools sort -n -l 0 - \
+    # | samtools fixmate -p - - \
+    # | samtools view -h -f 1 - \
+    # | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" -v region="${region}" '
+    #     /^@SQ/ {if($2!="SN:"chr) {next} else {$2="SN:"region; $3="LN:"len}} 
+    #     !/^@/ {$3=region; $4=$4-start+1; $8=$8-start+1}
+    #     {print}' \
+    # | samtools view -F 12 >> "${dir}"/"${bam%%.*}".captured.sam
+
+    # Extract only read pairs where both read and mate aligned within captured region.
     samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
      | samtools sort -n -l 0 - \
      | samtools fixmate -p - - \
@@ -50,15 +63,29 @@ for bam in "${@}"; do
          /^@SQ/ {if($2!="SN:"chr) {next} else {$2="SN:"region; $3="LN:"len}} 
          !/^@/ {$3=region; $4=$4-start+1; $8=$8-start+1}
          {print}' \
-     | samtools view -F 12 >> "${dir}"/"${bam%%.*}".captured.sam
+     | samtools view -F 12 -h \
+     | samtools sort -O SAM > "${dir}"/"${bam%%.*}"."${region}"_captured.sam
+
+    # Process SAM file into format for .hic conversion.
+    "${prepare_for_hic}" -f "${dir}"/"${bam%%.*}"."${region}"_captured.sam \
+      > "${dir}"/"${region}".hic_pre.txt
+
+    # Replace region name with chromosome number (for easier visualisation later).
+    sed -i "s/"${region}"/"${chr}"/g" "${dir}"/"${region}".hic_pre.txt
 
   done <"${capture_regions}"
 
-  cat "${dir}"/"${bam%%.*}".custom_header.sam "${dir}"/"${bam%%.*}".captured.sam \
-  | samtools view -Sb > "${dir}"/"${bam%%.*}".captured.bam
+  samtools merge -u -h "${dir}"/"${bam%%.*}".custom_header.sam - \
+    "${dir}"/"${bam%%.*}".*_captured.sam \
+    | samtools sort -n > "${dir}"/"${bam%%.*}".captured.sam
+
+  #cat "${dir}"/"${bam%%.*}".custom_header.sam "${dir}"/"${bam%%.*}".captured.sam \
+  #| samtools view -Sb > "${dir}"/"${bam%%.*}".captured.bam
+
+  ## Coordinate sort here - find minimum fragment number and minus from all entries then name sort....
+  ## Then convert to .hic file
 
   rm "${dir}"/"${bam%%.*}".captured.sam "${dir}"/"${bam%%.*}".custom_header.sam
-
 
 done; wait
 
