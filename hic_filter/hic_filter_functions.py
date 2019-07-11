@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 
-import math, sys, bisect
+import math, sys, bisect, logging
 
 from class_validators import *
 
+log = logging.getLogger(__name__)
+
 class fragment:
     
-    fragment_number = IntRange(0, math.inf)
-    fragment_start = IntRange(0, math.inf)
-    fragment_end = IntRange(0, math.inf)
+    number = IntRange(0, math.inf)
+    start = IntRange(0, math.inf)
+    end = IntRange(0, math.inf)
     
-    def __init__(self, fragment_number, start, end):
-        self.fragment_number = fragment_number
+    def __init__(self, number, start, end):
+        self.number = number
         self.start = start
         self.end = end
 
 def is_valid(read1, read2):
     if read1.qname != read2.qname:
-        sys.stderr.write(f'Qname mismatch: {read1.qname} {read2.qname} - is file name sorted?')
+        log.error(f'Qname mismatch: {read1.qname} {read2.qname} - is file name sorted?')
     elif not read1.is_paired and not read2.is_paired:
-        sys.stderr.write(f'{read1.qname} is not paired')
+        log.error(f'{read1.qname} is not paired')
     elif read1.is_read1 == read2.is_read1:
-        sys.stderr.write(f'R1 and R2 flags in {read1.qname} not correctly set')
+        log.error(f'R1 and R2 flags in {read1.qname} not correctly set')
     elif read1.pnext != read2.left_pos or read2.pnext != read1.left_pos:
-        sys.stderr.write(f'Mate position mismatch in {read1.qname}.')
+        log.error(f'Mate position mismatch in {read1.qname}.')
     else:
         return True
     return False
@@ -47,18 +49,17 @@ def tag_length(read, fragment):
     else:
         return fragment.end - read.five_prime_pos + 1
 
-def process_digest(digest_filename):
-    with open(digest_filename) as digest:
-        d = {}
-        for fragment in digest:
-            [ref, start, end, fragment_number] = fragment.split()
-            if not (int(start) > 0 and int(end) > 0):
-                raise ValueError(f'Negative fragment start/end positions on ref {ref}.')
-            if ref not in d.keys():
-                if not (int(start) == 1 and int(fragment_number) == 1):
-                    raise ValueError(f'Invalid first fragment in ref {ref}.')
-                d[ref] = []
-            d[ref].append(int(end))
+def process_digest(digest):
+    d = {}
+    for fragment in digest:
+        [ref, start, end, number] = fragment.split()
+        if not (int(start) > 0 and int(end) > 0):
+            log.error(f'Negative fragment start/end positions on ref {ref}.')
+        if ref not in d.keys():
+            if not (int(start) == 1 and int(number) == 1):
+                log.error(f'Invalid first fragment in ref {ref}.')
+            d[ref] = []
+        d[ref].append(int(end))
     return(d)
 
 def reorder_read_pair(read1, read2):
@@ -94,14 +95,14 @@ def get_orientation(read1, read2):
     return orientation
        
 def on_same_fragment(r1_fragment, r2_fragment):
-    return r1_fragment.fragment_number == r2_fragment.fragment_number
+    return r1_fragment.number == r2_fragment.number
 
 def on_adjacent_fragments(r1_fragment, r2_fragment):
-    return abs(r1_fragment.fragment_number == r2_fragment.fragment_number) == 1
+    return abs(r1_fragment.number == r2_fragment.number) == 1
 
 def run_filter(read1, read2, digest):
     if not is_valid(read1, read2):
-       raise ValueError(f'Invalid format in {read1.qname}.')     
+       log.error(f'Invalid format in {read1.qname}.')     
     read1, read2 = reorder_read_pair(read1, read2)
     orientation = get_orientation(read1, read2)
     read1_fragment = get_fragment(read1, digest)
@@ -109,6 +110,6 @@ def run_filter(read1, read2, digest):
     ditag_length = tag_length(read1, read1_fragment) + tag_length(read2, read2_fragment)
     insert_size = read2.right_pos - read1.left_pos + 1
     interaction = interaction_type(read1, read2)
-    fragment_seperation = abs(read2_fragment.fragment_number - read1_fragment.fragment_number)
+    fragment_seperation = abs(read2_fragment.number - read1_fragment.number)
     # ADD this to a dictionary??
-    return orientation, ditag_length, insert_size, interaction, fragment_seperation
+    return orientation, ditag_length, insert_size, interaction, fragment_seperation, read1_fragment.number, read2_fragment.number
