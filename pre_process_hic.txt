@@ -72,7 +72,7 @@ done
 while IFS=  read -r -d $'\0' fastq; do
   sample="${fastq##*/}"; sample="${sample%*.fq.gz}"
   zcat -f "${fastq}" \
-    | "${truncate_reads}" -r "${re_recognition}" -s "${sample/-trim*/}" -l "${qc_dir%*/}"/"${sample}".trunc_summary.txt \
+    | "${truncate_reads}" -e "${re_recognition}" -s "${sample/-trim*/}" -r "${qc_dir%*/}"/"${sample}".trunc_summary.txt \
     | gzip > "${raw_dir%*/}"/"${sample}"-trunc.fq.gz
 done < <(find "${raw_dir}" -type f -name "*-trim.fq.gz" -print0)
 cat "${qc_dir%*/}"/*trim.trunc_summary.txt > "${qc_dir%*/}"/all_samples.trunc_summary.txt
