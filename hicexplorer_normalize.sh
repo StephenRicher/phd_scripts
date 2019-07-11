@@ -32,10 +32,11 @@ if [[ "${6}" == "allele" ]]; then
 else
   samples=("HB2_WT" "HB2_CL4" "MCF7")
   # Include rf to use restriction fragment resolution but may break with nested TADS.
-  bin_range=( $(seq 3000 1000 15000) )
-  tracks=("/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7.ini" \
-          "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_replicate.ini"
-          "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_hitad.ini")
+  bin_range=( $(seq 2000 1000 10000) )
+  tracks=("/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad.ini" \
+          "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad_sum.ini"
+          "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_hitad.ini"
+          "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_hitad_sum.ini")
 fi
 
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
@@ -169,38 +170,6 @@ for binsize in "${bin_range[@]}"; do
   hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 --outFileNameHeatmap "${dir}"/correlation_plots/${region}-"${binsize}"-heatmap.png \
                --outFileNameScatter "${dir}"/correlation_plots/${region}-"${binsize}"-scatter.png --threads 6 --method pearson
 
-  # Iterate through replicate pairs and detect hierarchical TADs using hitad
-  if [[ "${binsize}" != "rf" ]]; then
-    mkdir -p "${dir}"/"${binsize}"/tads
-    for sample in "${samples[@]}"; do
-      echo res:"${binsize}" > "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile.txt
-      r=1
-      for replicate in "${dir}"/"${binsize}"/"${sample}"*-norm.h5; do
-        replicate_rmpath="${replicate##*/}"
-        out="${dir}"/"${binsize}"/"${replicate_rmpath%.h5}".cool
-        hicConvertFormat --matrices "${replicate}" \
-                         --outFileName "${out}" \
-                         --inputFormat h5 --outputFormat cool
-        nbins=$(($(tail -n 1 <(cooler dump "${out}") | cut -f 2) + 1))
-        chromsize=$((nbins*binsize))
-        # Load cooler and convert to normalised to integer
-        cooler load -f coo <(echo -e "${chr}\t${chromsize}"):"${binsize}" <(cooler dump "${out}" | awk -v OFS='\t' '$3=int($3)') "${out}".tmp.cool
-        mv "${out}".tmp.cool "${out}"
-        cooler balance --max-iters 1000 "${out}"
-        echo rep"${r}":"${out}" >> "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile.txt
-        ((r++))
-      done
-      hitad --output "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad.txt \
-            --datasets "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile.txt \
-            --logFile "${dir}"/"${binsize}"/tads/"${sample}"_hitad_log.txt \
-            --maxsize 1000000
-      awk -v start="${start}" -v OFS='\t' '
-              {$2=$2+start; $3=$3+start; print $1, $2, $3, $1, $2, $3, 0}' \
-        "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad.txt \
-        > "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad.links
-    done
-  fi
-
   mkdir -p "${dir}"/"${binsize}"/matrix_comparison/
   for ((i=0; i < ${#samples2[@]}; i++)); do
     sample1="${samples2[i]}"
@@ -282,6 +251,40 @@ for binsize in "${bin_range[@]}"; do
   montage "${dir}"/"${binsize}"/hic_plots_obs_exp/*-norm_iced_obs_exp.png -geometry 1200x1200+1+1 -tile 2x "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}_${binsize}_hic_plots.png
   montage "${dir}"/"${binsize}"/hic_plots_obs_exp/*-norm_sum_iced_obs_exp.png -geometry 1200x1200+1+1 -tile x1 "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}-${binsize}-sum_hic_plots.png
 
+  # Iterate through replicate pairs and detect hierarchical TADs using hitad
+  if [[ "${binsize}" != "rf" ]]; then
+    mkdir -p "${dir}"/"${binsize}"/tads
+    for sample in "${samples[@]}"; do
+      for type in "norm.h5" "norm_sum.h5"; do
+        echo res:"${binsize}" > "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile-"${type/.h5/}".txt
+        r=1
+        for replicate in "${dir}"/"${binsize}"/"${sample}"*"${type}"; do
+          replicate_rmpath="${replicate##*/}"
+          out="${dir}"/"${binsize}"/"${replicate_rmpath%.h5}".cool
+          hicConvertFormat --matrices "${replicate}" \
+                           --outFileName "${out}" \
+                           --inputFormat h5 --outputFormat cool
+          nbins=$(($(tail -n 1 <(cooler dump "${out}") | cut -f 2) + 1))
+          chromsize=$((nbins*binsize))
+          # Load cooler and convert to normalised to integer
+          cooler load -f coo <(echo -e "${chr}\t${chromsize}"):"${binsize}" <(cooler dump "${out}" | awk -v OFS='\t' '$3=int($3)') "${out}".tmp.cool
+          mv "${out}".tmp.cool "${out}"
+          cooler balance --max-iters 1000 "${out}"
+          echo rep"${r}":"${out}" >> "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile-"${type/.h5/}".txt
+          ((r++))
+        done
+        hitad --output "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".txt \
+              --datasets "${dir}"/"${binsize}"/tads/"${sample}"_hitad_metafile-"${type/.h5/}".txt \
+              --logFile "${dir}"/"${binsize}"/tads/"${sample}"_hitad_log-"${type/.h5/}".txt \
+              --maxsize 1000000
+        awk -v start="${start}" -v OFS='\t' '
+                {$2=$2+start; $3=$3+start; print $1, $2, $3, $1, $2, $3, 0}' \
+          "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".txt \
+          > "${dir}"/"${binsize}"/tads/"${sample}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".links
+      done
+    done
+  fi
+
   mkdir -p "${dir}"/"${binsize}"/tads
   mkdir -p "${dir}"/"${binsize}"/tad_plots/tracks
 
@@ -289,7 +292,7 @@ for binsize in "${bin_range[@]}"; do
 
     for track in "${tracks[@]}"; do
 
-      plot_track="${dir}"/"${binsize}"/tad_plots/tracks/"${track##*/}"-"${region}".ini
+      plot_track="${dir}"/"${binsize}"/tad_plots/tracks/"${track##*/}"-"${region}"-"${transform}".ini
 
       sed "s/-region-/-${region}-/g" ${track} > "${plot_track}"
       sed -i "s/-binsize-/-${binsize}-/g" "${plot_track}"
@@ -301,12 +304,16 @@ for binsize in "${bin_range[@]}"; do
         sed -i "/Start "${target}"/,/End "${target}"/d" "${plot_track}"
       done
 
-      if [[ "${track}" == *"replicate"* ]]; then
-        plotname="${dir}"/"${binsize}"/tad_plots/${region}_replicate_${binsize}_"${transform}".png
-      elif [[ "${track}" == *"hitad"* ]]; then
+      if [[ "${track}" == *"_sum.ini" ]]; then
+        if [[ "${track}" == *"hitad"* ]]; then
+          plotname="${dir}"/"${binsize}"/tad_plots/${region}_hitad_sum_${binsize}_"${transform}".png
+        else
+          plotname="${dir}"/"${binsize}"/tad_plots/${region}_ontad_sum_${binsize}_"${transform}".png
+        fi
+      elif [[ "${track}" == *"hitad.ini" ]]; then
         plotname="${dir}"/"${binsize}"/tad_plots/${region}_hitad_${binsize}_"${transform}".png
       else
-        plotname="${dir}"/"${binsize}"/tad_plots/${region}_${binsize}_${transform}.png
+        plotname="${dir}"/"${binsize}"/tad_plots/${region}_ontad_${binsize}_${transform}.png
       fi
 
       if [[ "${transform}" == "obs_exp" ]]; then
