@@ -2,7 +2,7 @@ filter="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/hic_filter.py"
 digest_file="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/digest/GRCh38_primary_assembly_Mbo1_digest.txt"
 filter_reads="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/filter_reads.py"
 extract_hic_info="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/extract_hic_info.py"
-filter_by_region="/home/stephen/h/phd/scripts2/hic_scripts/filter_by_region.txt"
+filter_by_region="/home/stephen/h/phd/scripts2/hic_scripts/filter_by_region2.txt"
 hicup_to_hicexplorer="/home/stephen/h/phd/scripts2/hic_scripts/hicup_to_hicexplorer.txt"
 hicexplorer_normalize="/home/stephen/phd/scripts/hicexplorer_normalize.sh"
 capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
@@ -23,10 +23,10 @@ qualimap multi-bamqc --data "${qc_dir%*/}"/multibamqc_config.txt \
                      -outdir "${qc_dir%*/}"/multi_bamQC \
                      --java-mem-size=4G
 
-for bam in "${@}"; do
+for bam in *name_sorted.bam; do
   (
   sample="${bam%%.*}"; sample="${sample##*/}"
-  samtools view -h "${bam}" | "${filter}" -d "${digest_file}" - | samtools view -Sb > "${sample}".hic_info.bam
+  samtools view -h "${bam}" | "${filter}" -d "${digest_file}" | samtools view -Sb > "${sample}".hic_info.bam
   # Sample 10% of reads and extract HiC stats.
   samtools view -s 42.05 "${sample}".hic_info.bam | "${extract_hic_info}" --sample "${sample}" - >> all_samples.hic_info_sampled.txt
   ) &
@@ -37,14 +37,13 @@ header=$(head -n 1 all_samples.hic_info_sampled.txt)
 (printf "%s\n" "$header"; grep -vFxe "${header}" all_samples.hic_info_sampled.txt) > all_samples.hic_info_sampled.tmp.txt
 mv all_samples.hic_info_sampled.tmp.txt all_samples.hic_info_sampled.txt
 
-for bam in "${@}"; do
+for bam in *hic_info.bam; do
   sample="${bam%%.*}"; sample="${sample##*/}"
-  echo Processing "${sample}".hic_info.bam
-  samtools view -@ 6 -h "${sample}".hic_info.bam \
-    | "${filter_reads}" --min_inward 1000 --max_ditag 1000 - \
-    | samtools view -@ 6 -b > "${sample}".filtered.bam
-  samtools sort -@ 3 "${sample}".filtered.bam > "${sample}".filtered-sort.bam
-  samtools index -@ 3 "${sample}".filtered-sort.bam
+  echo Processing "${bam}"
+  samtools view -h "${bam}"\
+    | "${filter_reads}" --min_inward 1000 --max_ditag 1000 \
+    |  samtools sort > "${sample}".filtered-sort.bam
+  samtools index "${sample}".filtered-sort.bam
 done
 
 "${filter_by_region}" "${capture_regions}" "${genome}" 12 . *filtered-sort.bam
