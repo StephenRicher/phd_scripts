@@ -15,8 +15,6 @@ qc_dir="${raw_dir%/}""/../qc_logs/"
 threads="6"
 
 # Define paths to relevant bash scripts
-remove_wrapping="/home/stephen/h/phd/scripts2/hic_scripts/remove_fasta_wrapping.sh"
-validate_fasta="/home/stephen/h/phd/scripts2/hic_scripts/validate_fasta.py"
 digest_genome="/home/stephen/h/phd/scripts2/hic_scripts/digest.py"
 truncate_reads="/home/stephen/h/phd/scripts2/hic_scripts/hic_truncate.py"
 split_fastq="/home/stephen/h/phd/scripts2/hic_scripts/split_fastq.sh"
@@ -46,15 +44,13 @@ split_fastq_dir="${raw_dir%/*}""/split_reads/"
 
 mkdir -p "${genome_dir%/*}"/ "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_fastq_dir}"
 
-# Download GRCh38 primary assembly and remove any FASTA line wrapping.
-curl "${genome_url}" | gunzip | "${remove_wrapping}" | gzip > "${genome_dir}"
+# Download GRCh38 primary assembly
+curl "${genome_url}" > "${genome_dir}"
 
-# Ensure FASTA is in valid format and generate Mbo1 digest and Bowtie2 index.
-if "${validate_fasta}" -f "${genome_dir}"; then
-  "${digest_genome}" -r "${re_recognition}" -f <(zcat "${genome_dir}") > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt &
-  bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
-  bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
-fi
+# Generate Mbo1 digest and Bowtie2 index.
+"${digest_genome}" -r "${re_recognition}" -d "${genome_dir}" > "${digest_dir%*/}"/"${digest_prefix}"_"${re_name}"_digest.txt
+bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
+bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
 
 fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
