@@ -8,6 +8,7 @@ sys.path.insert(0, '/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/')
 
 from sam_class import *
 from hic_filter_functions import *
+from gzip_opener import *
 
 def positive_int(value):
     ''' Custom argparse type for positive integer. '''
