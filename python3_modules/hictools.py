@@ -7,7 +7,7 @@ import sys, argparse, logging, select, re, time
 
 from exception_logger import *
 from gzip_opener import *
-import hictools_digest, hictools_truncate
+import hictools_digest, hictools_truncate, hictools_filter
 
 def main():
 
@@ -26,15 +26,7 @@ def main():
         add_help = False)
     base_parser.add_argument(
         '-o', '--output', nargs = '?', default = '-', 
-        help = 'Output file.')
-    base_parser.add_argument(
-        '-z', '--gzip', 
-        action = 'store_true', dest = 'write_gzip',
-        help = 'Compress output using gzip')
-    base_parser.add_argument(
-        '-u', '--gunzip', 
-        action = 'store_true', dest = 'read_gzip',
-        help = 'Read gzip compressed input.')
+        help = 'Output SAM file.')
     base_parser.add_argument(
         '-l', '--log', nargs = '?',
         help = 'Log output file.')
@@ -42,6 +34,19 @@ def main():
         '-v', '--verbose', 
         action = 'store_true',
         help = 'Verbose logging for debugging.')
+    
+    # Set parent parser for options only non-SAM processing
+    txt_parser = argparse.ArgumentParser(
+        formatter_class = formatter_class,
+        add_help = False)   
+    txt_parser.add_argument(
+        '-z', '--gzip', 
+        action = 'store_true', dest = 'write_gzip',
+        help = 'Compress output using gzip')
+    txt_parser.add_argument(
+        '-u', '--gunzip', 
+        action = 'store_true', dest = 'read_gzip',
+        help = 'Read gzip compressed input.')
 
     # Define subparser
     subparsers = parser.add_subparsers(
@@ -59,7 +64,7 @@ def main():
     digest_parser = subparsers.add_parser(digest_command,
         description = hictools_digest.description(),
         help = 'Generate in silico restriction digest of reference FASTA.', 
-        parents = [base_parser],
+        parents = [base_parser, txt_parser],
         formatter_class = formatter_class)
     digest_parser.add_argument(
         'infile', nargs = '?', default = '-',
@@ -80,7 +85,7 @@ def main():
     truncate_parser = subparsers.add_parser('truncate',
         description = hictools_truncate.description(),
         help = 'Truncate FASTQ sequences at restriction enzyme ligation site.', 
-        parents = [base_parser],
+        parents = [base_parser, txt_parser],
         formatter_class = formatter_class)
     truncate_parser.add_argument(
         'infile', nargs = '?', default = '-',
@@ -101,6 +106,31 @@ def main():
                   e.g. Mbol = ^GATC''')
     truncate_parser.set_defaults(function = hictools_truncate.truncate)
     commands[truncate_command] = truncate_parser
+    
+    # Filter sub-parser
+    filter_command = 'filter'
+    filter_parser = subparsers.add_parser(filter_command,
+        description = hictools_filter.description(),
+        help = 'Filter SAM file processed with HiCTools command_name', 
+        parents = [base_parser],
+        formatter_class = formatter_class)
+    filter_parser.add_argument(
+        'infile', nargs = '?', default = '-',
+        help = 'Input file in SAM format.')
+    filter_parser.add_argument(
+        '--min_inward', default = None, 
+        type = positive_int, 
+        help = 'Specify mininum insert size for inward facing read pairs.')
+    filter_parser.add_argument(
+        '--min_outward', default = None, 
+        type = positive_int, 
+        help = 'Specify mininum insert size for outward facing read pairs.')
+    filter_parser.add_argument(
+        '--max_ditag', default = None, 
+        type = positive_int, 
+        help = 'Specify maximum ditag size for read pairs.')
+    filter_parser.set_defaults(function = hictools_filter.filter)
+    commands[filter_command] = filter_parser
                   
     args = parser.parse_args()
 
@@ -128,7 +158,7 @@ def main():
         sys.exit(1)
 
     args_dict = vars(args)
-    [args_dict.pop(key) for key in ['function', 'verbose', 'log']]
+    [args_dict.pop(key) for key in ['command', 'function', 'verbose', 'log']]
     func(**vars(args))
 
 def restriction_seq(value):
@@ -143,6 +173,13 @@ def restriction_seq(value):
                 f'Restriction site {value} must only contain "ATCG^".')
     else:
         return value.upper()
+
+def positive_int(value):
+    ''' Custom argparse type for positive integer. '''
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f'{value} is not a positive integer.')
+    return ivalue
 
 if __name__ == '__main__':
     try:
