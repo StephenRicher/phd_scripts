@@ -113,7 +113,7 @@ def main():
         sys.exit(1)
 
     args_dict = vars(args)
-    [args_dict.pop(key) for key in ['function', 'verbose', 'log']]
+    [args_dict.pop(key) for key in ['command', 'function', 'verbose', 'log']]
     func(**vars(args))
 
 def positive_int(value):
