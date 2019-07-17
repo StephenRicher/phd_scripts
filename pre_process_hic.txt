@@ -4,7 +4,7 @@
 export TMPDIR=/home/stephen/x_am/RC-BB1219/stephen_test/tempfiles
 
 # Raw sequence directory
-raw_dir="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/raw_data"
+raw_dir="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/raw_data/"
 
 # Reference genome download parameters
 genome_url="ftp://ftp.ensembl.org/pub/release-92/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
@@ -17,7 +17,7 @@ threads="6"
 # Define paths to relevant bash scripts
 digest_genome="/home/stephen/h/phd/scripts2/hic_scripts/digest.py"
 truncate_reads="/home/stephen/h/phd/scripts2/hic_scripts/hic_truncate.py"
-split_fastq="/home/stephen/h/phd/scripts2/hic_scripts/split_fastq.sh"
+split_file="/home/stephen/h/phd/scripts2/hic_scripts/split_fastq.sh"
 
 # Bowtie2 index parameters
 bt2_dir="${genome_dir%/*}""/../bt2_index/"
@@ -40,7 +40,7 @@ min_qual="20"
 
 # Split FASTQ file parameters
 reads_per_file="10000000"
-split_fastq_dir="${raw_dir%/*}""/split_reads/"
+split_reads_dir="${raw_dir}"split_reads/
 
 mkdir -p "${genome_dir%/*}"/ "${qc_dir}" "${bt2_dir}" "${digest_dir}" "${split_fastq_dir}"
 
@@ -52,8 +52,10 @@ curl "${genome_url}" > "${genome_dir}"
 bowtie2-build "${genome_dir}" "${bt2_dir%*/}"/"${bt2_basename}" --threads "${threads}"
 bowtie2-inspect --summary "${bt2_dir%*/}"/"${bt2_basename}" > "${qc_dir%*/}"/"${bt2_basename}".bt2_index_summary.txt
 
+### RUN FASTQC ON RAW FASTQC FILES ###
 fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
+### RUN FASTQ SCREEN ON RAW FASTQC FILES ###
 fastq_screen --aligner bowtie2 --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*R[14].*f*q*
 
 for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
@@ -65,15 +67,25 @@ for sample in HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2; do
            "${raw_dir%*/}"/${sample}-R1.fastq.gz "${raw_dir%*/}"/${sample}-R4.fastq.gz > "${qc_dir%*/}"/${sample}.cutadapt.txt
 done
 
-while IFS=  read -r -d $'\0' fastq; do
-  sample="${fastq##*/}"; sample="${sample%*.fq.gz}"
-  zcat -f "${fastq}" \
-    | "${truncate_reads}" -e "${re_recognition}" -s "${sample/-trim*/}" -r "${qc_dir%*/}"/"${sample}".trunc_summary.txt \
-    | gzip > "${raw_dir%*/}"/"${sample}"-trunc.fq.gz
-done < <(find "${raw_dir}" -type f -name "*-trim.fq.gz" -print0)
-cat "${qc_dir%*/}"/*trim.trunc_summary.txt > "${qc_dir%*/}"/all_samples.trunc_summary.txt
+### TRUNCATE FASTQ FILES AT HIC LIGATION JUNCTION ###
+parallel -j 12 \
+  "zcat {1} \
+     | ${truncate_reads} --restriction ^GATC --sample {1/.} \
+                       --summary truncation_summary.txt \
+     | gzip > {=1 s/trim/trim-trunc/ =}" \
+  ::: *-trim.fq.gz
 
+### RUN FASTQC ON TRIMMED AND TRUNCATED FASTQ FILES ###
 fastqc --threads ${threads} --outdir "${qc_dir}" "${raw_dir%*/}"/*-trim-trunc.fq.gz
 
-"${split_fastq}" -n "${reads_per_file}" -o "${split_fastq_dir}" -t "${threads}" "${raw_dir%*/}"/*-trim-trunc.fq.gz
+### SPLIT FASTQ FILES INTO SMALLER FILES ####
+split_fastq() {
+  shopt -s extglob
+  prefix="${3%*/}"/"${1##*/}"; prefix="${prefix%.f*q?(.gz)}".part
+  zcat -f "${1}" \
+    | split -l $(("${2}"*4)) --filter='gzip > "${FILE}".fq.gz' - "${prefix}"
+}
+export -f split_fastq
+parallel -j 12 "split_fastq {1} ${reads_per_file} ${split_reads_dir}" ::: *-trim-trunc.fq.gz
+
 
