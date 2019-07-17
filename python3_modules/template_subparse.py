@@ -10,6 +10,7 @@ import argparse, sys, logging, select
 from exception_logger import *
 from gzip_opener import *
 
+
 def main():
 
     epilog = 'Steven Richer, University of Bath, Bath, UK (sr467@bath.ac.uk)'
@@ -51,11 +52,17 @@ def main():
     subparsers = parser.add_subparsers(
         title = 'required commands',
         description = '',
+        dest = 'command',
         metavar = 'Commands',
-        help = 'Description:',)
+        help = 'Description:')
+    
+    # Store each command name and parser in dictionary
+    commands = {}
     
     # Cat sub-parser
-    cat_parser = subparsers.add_parser('cat',
+    cat_command = 'cat'
+    cat_parser = subparsers.add_parser(cat_command,
+        description = 'cat command help description',
         help = 'Write input data to output.', 
         parents = [base_parser],
         formatter_class = formatter_class)
@@ -64,9 +71,12 @@ def main():
         type = positive_int,
         help = 'number')
     cat_parser.set_defaults(function = cat)
+    commands[cat_command] = cat_parser
     
     # Rev sub-parser
-    rev_parser = subparsers.add_parser('rev', 
+    rev_command = 'rev'
+    rev_parser = subparsers.add_parser(rev_command, 
+        description = 'rev command help description',
         help = 'Reverse input data and write to output.', 
         parents = [base_parser],
         formatter_class = formatter_class)
@@ -75,6 +85,7 @@ def main():
         type = int,
         help ='number')
     rev_parser.set_defaults(function = rev)
+    commands[rev_command] = rev_parser
     
     args = parser.parse_args()
     
@@ -93,11 +104,12 @@ def main():
         format = log_format, 
         level = log_level))
     sys.excepthook = handle_exception
-    
+
     data_in_stdin = select.select([sys.stdin,],[],[],0.0)[0]
     if not data_in_stdin and args.infile == '-':
         log.error(f'No input provided.\n')
-        parser.print_help()
+        # Call specific parser help for evoked command
+        commands[args.command].print_help()
         sys.exit(1)
 
     args_dict = vars(args)
