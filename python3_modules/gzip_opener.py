@@ -89,7 +89,7 @@ def smart_open(
                         log.exception(f'Unable to open {filename}.')
                         sys.exit(1)
                 p = subprocess.Popen(
-                        ['gzip'], stdout = outfile,
+                        ['gzip', '-f'], stdout = outfile,
                         stdin = subprocess.PIPE, encoding = encoding)
                 if filename != '-':
                     outfile.close()
