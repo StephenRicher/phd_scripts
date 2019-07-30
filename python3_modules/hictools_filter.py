@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-''' Filter HiC read pairs based on the HiC read pair information encoded in SAM optional '''
+""" Filter HiC read pairs to remove potential sources of contamination.
+    Input should be in SAM/BAM format and have been processed by 
+    hictools process.
+    """
 
-import argparse, sys, logging
-
-sys.path.insert(0, '/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/')
+import sys, argparse, logging
 
 from sam_class import *
 from hic_filter_functions import *
-from gzip_opener import *
+from sam_opener import *
 
 def description():
     
@@ -18,7 +19,8 @@ def description():
         
     return __doc__
 
-def filter(infile, output, min_inward, min_outward, max_ditag):
+def filter(
+    infile, output, samtools, sam_out, min_inward, min_outward, max_ditag):
 
     ''' Iterate through each infile. '''
     
@@ -29,8 +31,10 @@ def filter(infile, output, min_inward, min_outward, max_ditag):
         log.error('No filter settings defined.')
         sys.exit(1)
 
-    with smart_open(output, 'wt') as out_obj, \
-            smart_open(infile, 'rt') as in_obj:
+    mode = 'wt' if sam_out else 'wb'
+
+    with sam_open(output, mode, samtools = samtools) as out_obj, \
+            sam_open(infile, samtools = samtools) as in_obj:
         log.info(f'Writing output to {output}.')
 
         for line in in_obj:
