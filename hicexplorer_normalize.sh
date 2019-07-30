@@ -27,8 +27,8 @@ fi
 
 if [[ "${6}" == "allele" ]]; then
   samples=( "HB2_WT_G1" "HB2_WT_G2" "HB2_CL4_G1" "HB2_CL4_G2" "MCF7_G1" "MCF7_G2")
-  bin_range=( $(seq 5000 5000 100000) )
-  tracks=("hicexplorer_G1vsG2.ini")
+  bin_range=( $(seq 5000 5000 30000) )
+  tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_G1vsG2_ontad_sum.ini")
 else
   samples=("HB2_WT" "HB2_CL4" "MCF7")
   # Include rf to use restriction fragment resolution but may break with nested TADS.
@@ -210,8 +210,8 @@ for binsize in "${bin_range[@]}"; do
   vMax_not_sum=$(hicInfo --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
 
   for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
-    ## UNCOMMENT THIS!
-    continue
+
+
     matrix_rmpath="${matrix##*/}"
 
     hicTransform -m "${matrix}" --method obs_exp -o "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5
