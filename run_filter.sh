@@ -1,7 +1,5 @@
-filter="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/hic_filter.py"
-digest_file="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/digest/GRCh38_primary_assembly_Mbo1_digest.txt"
-filter_reads="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/filter_reads.py"
-extract_hic_info="/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/extract_hic_info.py"
+
+digest_file="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/digest/GRCh38_primary_assembly_Mbo1_digest.txt.gz"
 filter_by_region="/home/stephen/h/phd/scripts2/hic_scripts/filter_by_region2.txt"
 hicup_to_hicexplorer="/home/stephen/h/phd/scripts2/hic_scripts/hicup_to_hicexplorer.txt"
 hicexplorer_normalize="/home/stephen/phd/scripts/hicexplorer_normalize.sh"
@@ -9,6 +7,7 @@ capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
 genome="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 hicexplorer_normalize="/home/stephen/h/phd/scripts2/hic_scripts/hicexplorer_normalize.sh"
 qc_dir="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/qc_logs/"
+hictools="/home/stephen/phd/scripts/python3_modules/hictools.py"
 
 for bam in *.coord_sorted.bam; do
   qualimap bamqc -bam "${bam}" \
@@ -26,11 +25,14 @@ qualimap multi-bamqc --data "${qc_dir%*/}"/multibamqc_config.txt \
 for bam in *name_sorted.bam; do
   (
   sample="${bam%%.*}"; sample="${sample##*/}"
-  samtools view -h "${bam}" | "${filter}" -d "${digest_file}" | samtools view -Sb > "${sample}".hic_info.bam
+  #"${hictools}" process --digest "${digest_file}" --gunzip \
+  #                       --output "${sample}".hic_info.bam "${bam}"
   # Sample 10% of reads and extract HiC stats.
-  samtools view -s 42.05 "${sample}".hic_info.bam | "${extract_hic_info}" --sample "${sample}" - >> all_samples.hic_info_sampled.txt
-  ) &
-done; wait
+  samtools view -h -s 42.05 "${sample}".hic_info.bam \
+    | "${hictools}" extract --sample "${sample}" --gzip \
+     >> all_samples2.hic_info_sampled.txt.gz
+  )
+done
 
 # Remove all header from all_samples file and add 1 to the top of the file.
 header=$(head -n 1 all_samples.hic_info_sampled.txt)
@@ -77,7 +79,7 @@ done
 
 
 while IFS=$'\t' read -r chr start end region; do
-  "${hicexplorer_normalize}" "${region}" "${chr}" "${start}" "${end}" "${hcx_dir}"/all_regions/"${region}"
+  "${hicexplorer_normalize}" "${region}" "${chr}" "${start}" "${end}" "${hcx_dir}"/all_regions/"${region}" allele
 done <${capture_regions}
 
 
