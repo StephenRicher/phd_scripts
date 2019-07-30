@@ -10,7 +10,6 @@ import argparse, sys, logging, select
 from exception_logger import *
 from gzip_opener import *
 
-
 def main():
 
     epilog = 'Steven Richer, University of Bath, Bath, UK (sr467@bath.ac.uk)'
@@ -65,7 +64,8 @@ def main():
         description = 'cat command help description',
         help = 'Write input data to output.', 
         parents = [base_parser],
-        formatter_class = formatter_class)
+        formatter_class = formatter_class,
+        epilog = epilog)
     cat_parser.add_argument(
         '-p', '--parameter', default = 50,
         type = positive_int,
@@ -79,7 +79,8 @@ def main():
         description = 'rev command help description',
         help = 'Reverse input data and write to output.', 
         parents = [base_parser],
-        formatter_class = formatter_class)
+        formatter_class = formatter_class,
+        epilog = epilog)
     rev_parser.add_argument(
         '-n', '--number', default = 20,
         type = int,
