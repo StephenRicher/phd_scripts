@@ -1,84 +1,103 @@
 #!/bin/bash
 
+prepare_for_hic="/home/stephen/h/phd/scripts2/hic_scripts/prepare_for_hic.py"
+
 capture_regions="${1}"
 
 genome="${2}"
 
 threads="${3}"
 
-outdir="${4}"
+dir="${4}"
 
 shift 4
 
-dir="${outdir%/}"/diffhic/
-mkdir -p "${dir}"
+custom_hic="${dir}"/custom_bam
+custom_genome_dir="${custom_hic}"/custom_genome
+
+# Create out custom_hicectory if it does not exist
+mkdir -p "${custom_hic}" "${custom_genome_dir}"
+
+# Remove custom genome if it exists to prevent appending to existing.
+genome_no_path="${genome##*/}"
+rm "${custom_hic}"/"${genome_no_path%.fa}".captured_regions.fa
+
+# Create custom genome and rename FASTA header to region name.
+while IFS=$'\t' read -r chr start end region; do
+  samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
+  | sed "1 s/^.*$/>${region}/" \
+  | tee "${custom_genome_dir}"/"${region}".fa \
+  >> "${custom_hic}"/"${genome_no_path%.fa}".captured_regions.fa
+done <"${capture_regions}"
+
+exit 1
 
 for bam in "${@}"; do
 
-  # Extract read ID of all trans captured regions.
-  samtools view "${bam}" -L "${capture_regions}" \
-    | grep -e "it:Z:trans" \
-    | cut -f 1 > diffhic/"${bam%%.*}".ID_trans.txt
+  # Remove custom SAM if it exists to prevent appending to existing.
+  rm "${custom_hic}"/"${bam%%.*}".captured.sam
 
-  LC_ALL=C grep -w -F -f "${bam%%.*}".ID_trans.txt  < <(samtools view "${bam}" | grep -e "it:Z:trans") \
-    | cat <(samtools view -H "${bam}") - \
-    | samtools sort -n -l 0 - \
-    | samtools view -b > diffhic/"${bam%%.*}".trans.bam
+  # Extract SAM header and remove chromosome lines
+  samtools view -H "${bam}" | grep -v "@SQ" > "${custom_hic}"/"${bam%%.*}".custom_header.sam
 
   while IFS=$'\t' read -r chr start end region; do
 
-    mkdir -p "${dir}"/"${region}"
-
-    genome_no_path="${genome##*/}"
-    if [ ! -f "${dir}"/"${genome_no_path%.fa}"."${region}"-all.fa ]; then
-      samtools faidx  "${genome}" "${chr}":$((start+1))-"${end}" \
-      | sed '1 s/:.*$//' \
-      > "${dir}"/"${genome_no_path%.fa}"."${region}"-"${chr}"-$((start+1))-"${end}".fa
-
-      # Extract list of all chromosomes (except the captured chromosome) and combine with the captured region.
-      cat "${dir}"/"${genome_no_path%.fa}"."${region}"-"${chr}"-$((start+1))-"${end}".fa \
-        <(samtools faidx -r <(grep ">" "${genome}" | awk '{print $1}' | tr -d '>' | grep -vx "${chr}") "${genome}") \
-      > "${dir}"/"${genome_no_path%.fa}"."${region}"-all.fa
-    fi
+    echo Processing "${region}" in "${bam%%.*}"
 
     length=$((end-start))
+
+    # For each region insert a modified chromosome header after line 1.
+    sed -i "2i @SQ\tSN:${region}\tLN:${length}" "${custom_hic}"/"${bam%%.*}".custom_header.sam
 
     # Extract only read pairs where both read and mate aligned within captured region.
     samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
      | samtools sort -n -l 0 - \
      | samtools fixmate -p - - \
      | samtools view -h -f 1 - \
-     | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" '
-         /^@SQ/ {if($2!="SN:"chr) {next} else {$3="LN:"len}} 
-         !/^@/ {$4=$4-start+1; $8=$8-start+1}
+     | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" -v region="${region}" '
+         /^@SQ/ {if($2!="SN:"chr) {next} else {$2="SN:"region; $3="LN:"len}} 
+         !/^@/ {$3=region; $4=$4-start+1; $8=$8-start+1}
+		 !/^@/ {if($4 <= 0 || $8 <= 0) {next}}
          {print}' \
-     | samtools view -F 12 -b > "${dir}"/"${bam%%.*}"."${region}".bam
+     | samtools view -F 12 >> "${custom_hic}"/"${bam%%.*}".captured.sam
 
-    # Extract all trans read IDs that align within the capture region
-    samtools view "${bam}" "${chr}":$((start+1))-"${end}" \
-      | grep -e "it:Z:trans" \
-      | cut -f 1 > "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt
+    # Extract only read pairs where both read and mate aligned within captured region.
+    #samtools view -u "${bam}" "${chr}":$((start+1))-"${end}" \
+    # | samtools sort -n -l 0 - \
+    # | samtools fixmate -p - - \
+    # | samtools view -h -f 1 - \
+    # | awk -v OFS='\t' -v chr="${chr}" -v len="${length}" -v start="${start}" -v region="${region}" '
+    #     /^@SQ/ {if($2!="SN:"chr) {next} else {$2="SN:"region; $3="LN:"len}} 
+    #     !/^@/ {$3=region; $4=$4-start+1; $8=$8-start+1}
+    #     {print}' \
+    # | samtools view -F 12 -h \
+     #| samtools sort -O SAM > "${custom_hic}"/"${bam%%.*}"."${region}"_captured.sam
 
-    # Extract all read ID and corresponding trans mate that aligned within capture region.
-    LC_ALL=C grep -w -F -f "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt  < <(samtools view "${bam}" | grep -e "it:Z:trans") \
-      | cat <(samtools view -H "${bam}") - \
-      | awk -v OFS='\t' -v chr="${chr}" -v start="${start}" -v len="${length}" '
-          /^@SQ/ {if($2=="SN:"chr) {$3="LN:"len}}
-          !/^@/ {if($3==chr) {$4=$4-start+1}}
-          !/^@/ {if($7!="=") {$8=$8-start+1}}
-          {print}' \
-      | samtools sort -n -l 0 - \
-      | samtools view -b > "${dir}"/"${bam%%.*}"."${region}"_trans.bam
+    # Process SAM file into format for .hic conversion.
+    #"${prepare_for_hic}" -f "${custom_hic}"/"${bam%%.*}"."${region}"_captured.sam \
+    #  > "${custom_hic}"/"${region}".hic_pre.txt
 
-    # Merge the captured trans and captured only reads
-    samtools merge -n -f "${dir}"/"${bam%%.*}"."${region}"_all.bam \
-      "${dir}"/"${bam%%.*}"."${region}".bam \
-      "${dir}"/"${bam%%.*}"."${region}"_trans.bam
-
-    rm "${dir}"/"${bam%%.*}"."${region}"_trans.bam \
-       "${dir}"/"${bam%%.*}"."${region}"_ID_trans.txt \
+    # Replace region name with chromosome number (for easier visualisation later).
+    #sed -i "s/"${region}"/"${chr}"/g" "${custom_hic}"/"${region}".hic_pre.txt
 
   done <"${capture_regions}"
 
-done
+  #samtools merge -u -h "${custom_hic}"/"${bam%%.*}".custom_header.sam - \
+  #  "${custom_hic}"/"${bam%%.*}".*_captured.sam \
+   # | samtools sort -n > "${custom_hic}"/"${bam%%.*}".captured.sam
+
+  cat "${custom_hic}"/"${bam%%.*}".custom_header.sam "${custom_hic}"/"${bam%%.*}".captured.sam \
+  | samtools view -Sb > "${custom_hic}"/"${bam%%.*}".captured.bam
+
+  ## Coordinate sort here - find minimum fragment number and minus from all entries then name sort....
+  ## Then convert to .hic file
+
+  rm "${custom_hic}"/"${bam%%.*}".captured.sam "${custom_hic}"/"${bam%%.*}".custom_header.sam
+
+  samtools view -bf 0x40 "${custom_hic}"/"${bam%%.*}".captured.bam > "${custom_hic}"/"${bam%%.*}".R1.captured.bam
+  samtools view -bf 0x80 "${custom_hic}"/"${bam%%.*}".captured.bam > "${custom_hic}"/"${bam%%.*}".R2.captured.bam
+
+done; wait
+
+
 
