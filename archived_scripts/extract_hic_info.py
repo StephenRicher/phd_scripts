@@ -5,8 +5,6 @@
 
 import sys, argparse, logging
 
-sys.path.insert(0, '/home/stephen/h/phd/scripts2/hic_scripts/hic_filter/')
-
 from sam_class import *
 from hic_filter_functions import *
 
