@@ -7,7 +7,9 @@ import sys, argparse, logging, select, re, time
 
 from exception_logger import *
 from gzip_opener import *
-import hictools_digest, hictools_truncate, hictools_filter
+import  hictools_digest, hictools_truncate, \
+        hictools_filter, hictools_extract, \
+        hictools_process
 
 def main():
 
@@ -26,7 +28,7 @@ def main():
         add_help = False)
     base_parser.add_argument(
         '-o', '--output', nargs = '?', default = '-', 
-        help = 'Output SAM file.')
+        help = 'Output file.')
     base_parser.add_argument(
         '-l', '--log', nargs = '?',
         help = 'Log output file.')
@@ -47,6 +49,17 @@ def main():
         '-u', '--gunzip', 
         action = 'store_true', dest = 'read_gzip',
         help = 'Read gzip compressed input.')
+        
+    # Set common parent parser options for SAM processing
+    sam_parser = argparse.ArgumentParser(
+        formatter_class = formatter_class,
+        add_help = False)   
+    sam_parser.add_argument(
+        'infile', nargs = '?', default = '-',
+        help = 'Input file in SAM/BAM format.')
+    sam_parser.add_argument(
+        '--samtools', default = 'samtools',
+        help = 'Set path to samtools installation.')
 
     # Define subparser
     subparsers = parser.add_subparsers(
@@ -65,7 +78,8 @@ def main():
         description = hictools_digest.description(),
         help = 'Generate in silico restriction digest of reference FASTA.', 
         parents = [base_parser, txt_parser],
-        formatter_class = formatter_class)
+        formatter_class = formatter_class,
+        epilog = epilog)
     digest_parser.add_argument(
         'infile', nargs = '?', default = '-',
         help = 'Input reference in FASTA format.')
@@ -79,14 +93,14 @@ def main():
     digest_parser.set_defaults(function = hictools_digest.digest)
     commands[digest_command] = digest_parser
     
-    
     # Truncate sub-parser
     truncate_command = 'truncate'
     truncate_parser = subparsers.add_parser('truncate',
         description = hictools_truncate.description(),
         help = 'Truncate FASTQ sequences at restriction enzyme ligation site.', 
         parents = [base_parser, txt_parser],
-        formatter_class = formatter_class)
+        formatter_class = formatter_class,
+        epilog = epilog)
     truncate_parser.add_argument(
         'infile', nargs = '?', default = '-',
         help = 'Input file in FASTQ format.')
@@ -107,16 +121,58 @@ def main():
     truncate_parser.set_defaults(function = hictools_truncate.truncate)
     commands[truncate_command] = truncate_parser
     
+    # Process sub-parser
+    process_command = 'process'
+    process_parser = subparsers.add_parser(process_command,
+        description = hictools_process.description(),
+        help = 'Determine HiC fragment mappings from '
+               'named-sorted SAM/BAM file.', 
+        parents = [base_parser, sam_parser],
+        formatter_class = formatter_class,
+        epilog = epilog)
+    process_parser.add_argument(
+        '-S', '--sam', dest = 'sam_out',
+        action = 'store_true',
+        help = 'Output alignments in SAM format.')
+    process_parser.add_argument(
+        '-u', '--gunzip', 
+        action = 'store_true', dest = 'read_gzip',
+        help = 'Read gzip compressed digest file.')
+    requiredNamed_process = process_parser.add_argument_group(
+        'required named arguments')
+    requiredNamed_process.add_argument(
+        '-d', '--digest', required = True,
+        help = 'Output of hictools digest using same '
+               'reference genome as used to map reads.')
+    process_parser.set_defaults(function = hictools_process.process)
+    commands[process_command] = process_parser
+                  
+    # Extract sub-parser
+    extract_command = 'extract'
+    extract_parser = subparsers.add_parser(extract_command,
+        description = hictools_extract.description(),
+        help = 'Extract HiC information encoded by hic process from SAM/BAM.', 
+        parents = [base_parser, sam_parser],
+        formatter_class = formatter_class,
+        epilog = epilog)
+    extract_parser.add_argument(
+        '-z', '--gzip', 
+        action = 'store_true', dest = 'write_gzip',
+        help = 'Compress output using gzip')
+    extract_parser.add_argument(
+        '-n', '--sample', default = None,
+        help = 'Sample name for input.')
+    extract_parser.set_defaults(function = hictools_extract.extract)
+    commands[extract_command] = extract_parser
+    
     # Filter sub-parser
     filter_command = 'filter'
     filter_parser = subparsers.add_parser(filter_command,
         description = hictools_filter.description(),
-        help = 'Filter SAM file processed with HiCTools command_name', 
-        parents = [base_parser],
-        formatter_class = formatter_class)
-    filter_parser.add_argument(
-        'infile', nargs = '?', default = '-',
-        help = 'Input file in SAM format.')
+        help = 'Filter SAM/BAM file processed with hictools process.', 
+        parents = [base_parser, sam_parser],
+        formatter_class = formatter_class,
+        epilog = epilog)
     filter_parser.add_argument(
         '--min_inward', default = None, 
         type = positive_int, 
@@ -129,6 +185,10 @@ def main():
         '--max_ditag', default = None, 
         type = positive_int, 
         help = 'Specify maximum ditag size for read pairs.')
+    filter_parser.add_argument(
+        '-S', '--sam', dest = 'sam_out',
+        action = 'store_true',
+        help = 'Output alignments in SAM format.')
     filter_parser.set_defaults(function = hictools_filter.filter)
     commands[filter_command] = filter_parser
                   
@@ -170,7 +230,7 @@ def restriction_seq(value):
             f'Restriction site {value} must contain one "^" at cut site.')
     elif re.search('[^ATCG^]', value, re.IGNORECASE):
         raise argparse.ArgumentTypeError(
-                f'Restriction site {value} must only contain "ATCG^".')
+            f'Restriction site {value} must only contain "ATCG^".')
     else:
         return value.upper()
 
@@ -178,7 +238,8 @@ def positive_int(value):
     ''' Custom argparse type for positive integer. '''
     ivalue = int(value)
     if ivalue <= 0:
-        raise argparse.ArgumentTypeError(f'{value} is not a positive integer.')
+        raise argparse.ArgumentTypeError(
+            f'{value} is not a positive integer.')
     return ivalue
 
 if __name__ == '__main__':
