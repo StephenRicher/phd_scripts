@@ -115,7 +115,7 @@ def main():
 
     args_dict = vars(args)
     [args_dict.pop(key) for key in ['command', 'function', 'verbose', 'log']]
-    func(**vars(args))
+    return func(**vars(args))
 
 def positive_int(value):
         
@@ -151,7 +151,8 @@ def rev(infile, output, read_gzip, write_gzip, number):
 
 if __name__ == '__main__':
     try:
-        main()
+        sys.exit(main())
     finally:
         logging.shutdown()
+
 
