@@ -31,16 +31,16 @@ shift 2
 # Define cores
 threads=${SLURM_CPUS_PER_TASK}
 
-alias hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
+hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
 
-mpirun hictools map \
+mpirun "${hictools}" map \
 	--index "${genome_index}" --sample "${sample}" \
 	--log "${sample}".bowtie2.logfile \
 	--threads "${threads}" "${@}" \
 	> "${sample}".bam \
 	2> "${sample}"_alignment_stats.txt
 
-mpirun hictools deduplicate \
+mpirun "${hictools}" deduplicate \
 	--log "${sample}".dedup.logfile \
 	"${sample}".bam \
 	> "${sample}".dedup.bam
