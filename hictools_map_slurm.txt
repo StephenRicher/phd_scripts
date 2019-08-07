@@ -26,14 +26,21 @@ sample="${1}"
 genome_index="${2}"
 
 # All other arguments are files to process.
-shift
+shift 2
 
 # Define cores
 threads=${SLURM_CPUS_PER_TASK}
 
-/home/u/sr467/scratch/scripts/hictools/hictools.py map \
+alias hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
+
+mpirun hictools map \
 	--index "${genome_index}" --sample "${sample}" \
 	--bowtie2_log "${sample}"_alignment_stats.txt \
 	--log "${sample}".bowtie2.logfile \
 	--threads "${threads}" --output "${sample}".bam "${@}"
-	
+
+mpirun hictools deduplicate \
+	--sample "${sample}" \
+	--output "${sample}".dedup.bam \
+	--log "${sample}".dedup.logfile \
+	"${sample}".bam
