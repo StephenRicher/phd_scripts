@@ -71,9 +71,9 @@ parallel -j 12 \
 
 ## Truncate seqeuences at restriction ligation junction ##
 parallel -j 12 \
-	"hictools truncate --restriction ^GATC -zu \
-    	--summary "${qc}"/hictools-truncate_summary.txt {1} \
-    	> {=1 s/trim/trim-trunc/ =}" \
+	"hictools truncate --restriction ^GATC -zu {1} \
+    	> {=1 s/trim/trim-trunc/ =} \
+		2>> "${qc}"/hictools-truncate_summary.txt" \
 	::: "${data_dir}"/*trim.fq.gz
 
 ## Run FastQC on adapter trimmed and truncated data ##
@@ -81,36 +81,41 @@ fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*trim-trunc.fq.gz
 
 # Map R1 and R2 reads
 for sample in "${samples[@]}"; do
-	hictools map --index "${genome_index}" --sample "${sample}" \
-		--bowtie2_log "${qc}"/"${sample}"_alignment_stats.txt \
+	hictools map \
+		--sample "${sample}" --index "${genome_index}"  \
 		--log "${qc}"/"${sample}".bowtie2.logfile \
-		--output "${data_dir}"/"${sample}".bam \
-		"${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz
+		"${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
+		> "${data_dir}"/"${sample}".bam \
+		2> "${qc}"/"${sample}"_alignment_stats.txt
 
-	hictools deduplicate --sample "${sample}" \
-		--output "${data_dir}"/"${sample}".dedup.bam \
+	hictools deduplicate \
 		--log "${qc}"/"${sample}".dedup.logfile \
-		"${data_dir}"/"${sample}".bam
+		"${data_dir}"/"${sample}".bam \
+		> "${data_dir}"/"${sample}".dedup.bam
+		2> "${qc}"/"${sample}".dedup_stats.txt
 
 	rm "${data_dir}"/"${sample}".bam
 
-	hictools process --digest "${genome_digest}" \
+	hictools process \
+		--digest "${genome_digest}" \
 		--log "${qc}"/"${sample}".process.logfile \
-		--output "${data_dir}"/"${sample}".proc.bam \
-		"${data_dir}"/"${sample}".dedup.bam
+		"${data_dir}"/"${sample}".dedup.bam \
+		> "${data_dir}"/"${sample}".proc.bam
 	
 	rm "${data_dir}"/"${sample}".dedup.bam
 
-	hictools extract --sample "${sample}" --gzip \
-		--log "${qc}"/"${sample}".extract.logfile
+	hictools extract \
+		--sample "${sample}" --gzip \
+		--log "${qc}"/"${sample}".extract.logfile \
 		<(samtools view -s 42.1 "${data_dir}"/"${sample}".proc.bam) \
 		>> "${qc}"/hic_filter_qc.txt
 
 	# CONFIRM THESE PARAMETERS!!!##
-	hictools filter --max_ditag 1000 --min_outward 1000 \
+	hictools filter \
+		--max_ditag 1000 --min_outward 1000 \
 		--log "${qc}"/"${sample}".filter.logfile \
-		--output "${data_dir}"/"${sample}".filt.bam \
 		"${data_dir}"/"${sample}".proc.bam
+		> "${data_dir}"/"${sample}".filt.bam
 
 	rm "${data_dir}"/"${sample}".proc.bam
 done
