@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#SBATCH --account=ba-fs6sdb
+#SBATCH --job-name=bowtie2_align_%j
+#SBATCH --output=/home/u/sr467/scratch/projects/HiC/job_logs/bowtie2_align_%j.out
+#SBATCH --error=/home/u/sr467/scratch/projects/HiC/job_logs/bowtie2_align_%j.err
+#SBATCH --partition=batch
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=12:00:00
+#SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/truncated_data
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=sr467@bath.ac.uk
+
+module purge
+module load slurm
+module load openmpi/intel
+module load samtools/1.9
+module load bowtie2
+module load python3
+
+# Define sample name
+sample="${1}"
+
+# Bowtie2 index is first argument.
+genome_index="${2}"
+
+# All other arguments are files to process.
+shift
+
+# Define cores
+threads=${SLURM_CPUS_PER_TASK}
+
+/home/u/sr467/scratch/scripts/hictools/hictools.py map \
+	--index "${genome_index}" --sample "${sample}" \
+	--bowtie2_log "${sample}"_alignment_stats.txt \
+	--log "${sample}".bowtie2.logfile \
+	--threads "${threads}" --output "${sample}".bam "${@}"
+	
