@@ -41,7 +41,7 @@ mpirun "${hictools}" map \
 			--sample "${sample}" \
 			--log "${sample}".bowtie2.logfile \
 			--threads "${threads}" "${@}" \
-			2> "${sample}"_alignment_stats.txt \
+			2> "${sample}".bowtie2_stats.txt \
 		| "${hictools}" deduplicate \
 			--log "${sample}".dedup.logfile \
 			2> "${sample}".dedup_stats.txt \
