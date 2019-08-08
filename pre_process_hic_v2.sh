@@ -79,13 +79,23 @@ parallel -j 12 \
 ## Run FastQC on adapter trimmed and truncated data ##
 fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*trim-trunc.fq.gz
 
+alignment_stats=alignment_stats.txt
+rm "${alignment_stats}"
+printf 'sample\ttotal_mapped_pairs\tboth_pairs_unmapped\t' >> "${alignment_stats}"
+printf 'r1_map_r2_unmapped\tr2_map_r1_unmapped\tduplicate_pairs\t' >> "${alignment_stats}"
+printf 'quality_filtered_pairs\ttotal_pairs_retained\n' >> "${alignment_stats}"
+
 # Map R1 and R2 reads
 for sample in "${samples[@]}"; do
+
+	# File for intermediate logfile
+	intermediate="${data_dir}"/"${sample}".fixmate.bam
 
 	hictools map \
 		--index "${genome_index}"  \
 		--sample "${sample}"
 		--log "${qc}"/"${sample}".bowtie2.logfile \
+		--intermediate "${intermediate}" \
 		"${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
 		2> "${qc}"/"${sample}"_alignment_stats.txt \
 	| hictools deduplicate \
@@ -95,6 +105,21 @@ for sample in "${samples[@]}"; do
 		--digest "${genome_digest}" \
 		--log "${qc}"/"${sample}".process.logfile \
 		> "${data_dir}"/"${sample}".proc.bam
+
+	total_pairs=$(samtools view -cf 64 "${intermediate}")
+	both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
+	r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
+	r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
+	unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
+	duplicate_pairs=$(sed -n '4p' "${qc}"/"${sample}".dedup_stats.txt | awk '{print $3/2}')
+	total_kept_pairs=$(samtools view -cf 64 "${data_dir}"/"${sample}".proc.bam)
+	qual_filtered_pairs=$(( raw_total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
+
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+		"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
+		"${r1_map_r2_unmap}" "${r2_map_r1_unmap}" \
+		"${duplicate_pairs}" "${qual_filtered_pairs}" \
+		"${total_kept_pairs}" >> "${alignment_stats}"
 
 	hictools extract \
 		--sample "${sample}" --gzip \
@@ -109,5 +134,5 @@ for sample in "${samples[@]}"; do
 		"${data_dir}"/"${sample}".proc.bam
 		> "${data_dir}"/"${sample}".filt.bam
 
-	rm "${data_dir}"/"${sample}".proc.bam
+
 done
