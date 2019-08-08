@@ -37,10 +37,12 @@ threads=${SLURM_CPUS_PER_TASK}
 hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
 
 alignment_stats=alignment_stats.txt
-rm "${alignment_stats}"
-printf 'sample\ttotal_mapped_pairs\tboth_pairs_unmapped\t' >> "${alignment_stats}"
-printf 'r1_map_r2_unmapped\tr2_map_r1_unmapped\tduplicate_pairs\t' >> "${alignment_stats}"
-printf 'quality_filtered_pairs\ttotal_pairs_retained\n' >> "${alignment_stats}"
+
+if [[ ! -f "${alignment_stats}" ]]; then
+    printf 'sample\ttotal_mapped_pairs\tboth_pairs_unmapped\t' >> "${alignment_stats}"
+	printf 'r1_map_r2_unmapped\tr2_map_r1_unmapped\tduplicate_pairs\t' >> "${alignment_stats}"
+	printf 'quality_filtered_pairs\ttotal_pairs_retained\n' >> "${alignment_stats}"
+fi
 
 # File for intermediate logfile
 intermediate="${sample}".fixmate.bam
@@ -60,14 +62,14 @@ mpirun "${hictools}" map \
 			--log "${sample}".process.logfile \
 			> "${sample}".proc.bam
 
-mpirun total_pairs=$(samtools view -cf 64 "${intermediate}")
-mpirun both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
-mpirun r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
-mpirun r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
-mpirun unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
-mpirun duplicate_pairs=$(sed -n '4p' "${sample}".dedup_stats.txt | awk '{print $3/2}')
-mpirun total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
-mpirun qual_filtered_pairs=$(( raw_total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
+total_pairs=$(samtools view -cf 64 "${intermediate}")
+both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
+r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
+r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
+unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
+duplicate_pairs=$(sed -n '4p' "${sample}".dedup_stats.txt | awk '{print $3/2}')
+total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
+qual_filtered_pairs=$(( raw_total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
 		"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
