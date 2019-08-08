@@ -22,11 +22,14 @@ module load python3
 # Define sample name
 sample="${1}"
 
-# Bowtie2 index is first argument.
+# Bowtie2 index
 genome_index="${2}"
 
+# Digest file from hictools digest
+genome_digest="${3}"
+
 # All other arguments are files to process.
-shift 2
+shift 3
 
 # Define cores
 threads=${SLURM_CPUS_PER_TASK}
@@ -34,14 +37,15 @@ threads=${SLURM_CPUS_PER_TASK}
 hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
 
 mpirun "${hictools}" map \
-	--index "${genome_index}" --sample "${sample}" \
-	--log "${sample}".bowtie2.logfile \
-	--threads "${threads}" "${@}" \
-	> "${sample}".bam \
-	2> "${sample}"_alignment_stats.txt
-
-mpirun "${hictools}" deduplicate \
-	--log "${sample}".dedup.logfile \
-	"${sample}".bam \
-	> "${sample}".dedup.bam
-	2> "${sample}".dedup_stats.txt
+			--index "${genome_index}"  \
+			--sample "${sample}" \
+			--log "${sample}".bowtie2.logfile \
+			--threads "${threads}" "${@}" \
+			2> "${sample}"_alignment_stats.txt \
+		| "${hictools}" deduplicate \
+			--log "${sample}".dedup.logfile \
+			2> "${qc}"/"${sample}".dedup_stats.txt \
+		| "${hictools}" process \
+			--digest "${genome_digest}" \
+			--log "${sample}".process.logfile \
+			> "${sample}".proc.bam
