@@ -7,7 +7,7 @@
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=12:00:00
+#SBATCH --time=16:00:00
 #SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/truncated_data
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=sr467@bath.ac.uk
@@ -44,7 +44,7 @@ mpirun "${hictools}" map \
 			2> "${sample}"_alignment_stats.txt \
 		| "${hictools}" deduplicate \
 			--log "${sample}".dedup.logfile \
-			2> "${qc}"/"${sample}".dedup_stats.txt \
+			2> "${sample}".dedup_stats.txt \
 		| "${hictools}" process \
 			--digest "${genome_digest}" \
 			--log "${sample}".process.logfile \
