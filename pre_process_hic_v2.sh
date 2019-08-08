@@ -81,28 +81,20 @@ fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*trim-trunc.fq.gz
 
 # Map R1 and R2 reads
 for sample in "${samples[@]}"; do
+
 	hictools map \
-		--sample "${sample}" --index "${genome_index}"  \
+		--index "${genome_index}"  \
+		--sample "${sample}"
 		--log "${qc}"/"${sample}".bowtie2.logfile \
 		"${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
-		> "${data_dir}"/"${sample}".bam \
-		2> "${qc}"/"${sample}"_alignment_stats.txt
-
-	hictools deduplicate \
+		2> "${qc}"/"${sample}"_alignment_stats.txt \
+	| hictools deduplicate \
 		--log "${qc}"/"${sample}".dedup.logfile \
-		"${data_dir}"/"${sample}".bam \
-		> "${data_dir}"/"${sample}".dedup.bam
-		2> "${qc}"/"${sample}".dedup_stats.txt
-
-	rm "${data_dir}"/"${sample}".bam
-
-	hictools process \
+		2> "${qc}"/"${sample}".dedup_stats.txt \
+	| hictools process \
 		--digest "${genome_digest}" \
 		--log "${qc}"/"${sample}".process.logfile \
-		"${data_dir}"/"${sample}".dedup.bam \
 		> "${data_dir}"/"${sample}".proc.bam
-	
-	rm "${data_dir}"/"${sample}".dedup.bam
 
 	hictools extract \
 		--sample "${sample}" --gzip \
