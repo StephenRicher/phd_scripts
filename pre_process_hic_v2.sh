@@ -113,7 +113,7 @@ for sample in "${samples[@]}"; do
 	unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
 	duplicate_pairs=$(sed -n '4p' "${qc}"/"${sample}".dedup_stats.txt | awk '{print $3/2}')
 	total_kept_pairs=$(samtools view -cf 64 "${data_dir}"/"${sample}".proc.bam)
-	qual_filtered_pairs=$(( raw_total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
+	qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
 	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
 		"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
