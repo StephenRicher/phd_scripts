@@ -106,7 +106,7 @@ for sample in "${samples[@]}"; do
 		--log "${qc}"/"${sample}".process.logfile \
 		> "${data_dir}"/"${sample}".proc.bam
 
-	total_pairs=$(samtools view -cf 64 "${intermediate}")
+	total_pairs=$(grep -m 1 'reads; of these:' "${sample}".bowtie2_stats.txt | awk '{print $1}')
 	both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
 	r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
 	r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
