@@ -55,12 +55,8 @@ def main():
         metavar = 'Commands',
         help = 'Description:')
     
-    # Store each command name and parser in dictionary
-    commands = {}
-    
     # Cat sub-parser
-    cat_command = 'cat'
-    cat_parser = subparsers.add_parser(cat_command,
+    cat_parser = subparsers.add_parser('cat',
         description = 'cat command help description',
         help = 'Write input data to output.', 
         parents = [base_parser],
@@ -74,8 +70,7 @@ def main():
     commands[cat_command] = cat_parser
     
     # Rev sub-parser
-    rev_command = 'rev'
-    rev_parser = subparsers.add_parser(rev_command, 
+    rev_parser = subparsers.add_parser('rev', 
         description = 'rev command help description',
         help = 'Reverse input data and write to output.', 
         parents = [base_parser],
@@ -86,7 +81,6 @@ def main():
         type = int,
         help ='number')
     rev_parser.set_defaults(function = rev)
-    commands[rev_command] = rev_parser
     
     args = parser.parse_args()
     
@@ -105,13 +99,6 @@ def main():
         format = log_format, 
         level = log_level))
     sys.excepthook = handle_exception
-
-    data_in_stdin = select.select([sys.stdin,],[],[],0.0)[0]
-    if not data_in_stdin and args.infile == '-':
-        log.error(f'No input provided.\n')
-        # Call specific parser help for evoked command
-        commands[args.command].print_help()
-        sys.exit(1)
 
     args_dict = vars(args)
     [args_dict.pop(key) for key in ['command', 'function', 'verbose', 'log']]
