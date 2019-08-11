@@ -7,7 +7,7 @@
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=16:00:00
+#SBATCH --time=24:00:00
 #SBATCH --workdir=/home/u/sr467/scratch/projects/HiC/truncated_data
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=sr467@bath.ac.uk
@@ -48,19 +48,19 @@ fi
 intermediate="${sample}".fixmate.bam
 
 mpirun "${hictools}" map \
-			--index "${genome_index}"  \
-			--sample "${sample}" \
-			--intermediate "${intermediate}" \
-			--log "${sample}".bowtie2.logfile \
-			--threads "${threads}" "${@}" \
-			2> "${sample}".bowtie2_stats.txt \
-		| "${hictools}" deduplicate \
-			--log "${sample}".dedup.logfile \
-			2> "${sample}".dedup_stats.txt \
-		| "${hictools}" process \
-			--digest "${genome_digest}" \
-			--log "${sample}".process.logfile \
-			> "${sample}".proc.bam
+	--index "${genome_index}"  \
+	--sample "${sample}" \
+	--intermediate "${intermediate}" \
+	--log "${sample}".bowtie2.logfile \
+	--threads "${threads}" "${@}" \
+	2> "${sample}".bowtie2_stats.txt \
+| "${hictools}" deduplicate \
+	--log "${sample}".dedup.logfile \
+	2> "${sample}".dedup_stats.txt \
+| "${hictools}" process \
+	--digest "${genome_digest}" \
+	--log "${sample}".process.logfile \
+	> "${sample}".proc.bam
 
 total_pairs=$(grep -m 1 'reads; of these:' "${sample}".bowtie2_stats.txt | awk '{print $1}')
 both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
@@ -72,7 +72,7 @@ total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
 qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-		"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
-		"${r1_map_r2_unmap}" "${r2_map_r1_unmap}" \
-		"${duplicate_pairs}" "${qual_filtered_pairs}" \
-		"${total_kept_pairs}" >> "${alignment_stats}"
+	"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
+	"${r1_map_r2_unmap}" "${r2_map_r1_unmap}" \
+	"${duplicate_pairs}" "${qual_filtered_pairs}" \
+	"${total_kept_pairs}" >> "${alignment_stats}"
