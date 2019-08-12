@@ -34,7 +34,7 @@ shift 3
 # Define cores
 threads=${SLURM_CPUS_PER_TASK}
 
-hictools=/home/u/sr467/scratch/scripts/hictools/hictools.py
+hictools=/home/stephen/phd/hictools/hictools/hictools.py
 
 alignment_stats=alignment_stats.txt
 
