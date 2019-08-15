@@ -54,13 +54,16 @@ mpirun "${hictools}" map \
 	--log "${sample}".bowtie2.logfile \
 	--threads "${threads}" "${@}" \
 	2> "${sample}".bowtie2_stats.txt \
-| "${hictools}" deduplicate \
-  --log "${sample}".deduplicate.logfile \
-  2> "${sample}".dedup_stats.txt \
-| "${hictools}" process \
-  --digest "${genome_digest}" \
-  --log "${sample}".process.logfile \
-  > "${sample}".proc.bam
+	> "${sample}".bowtie2.bam
+mpirun "${hictools}" deduplicate \
+    --log "${sample}".deduplicate.logfile \
+    "${sample}".bowtie2.bam \
+    2> "${sample}".dedup_stats.txt \
+	> "${sample}".dedup.bam
+#| "${hictools}" process \
+#  --digest "${genome_digest}" \
+#  --log "${sample}".process.logfile \
+#  > "${sample}".proc.bam
 
 total_pairs=$(grep -m 1 'reads; of these:' "${sample}".bowtie2_stats.txt | awk '{print $1}')
 both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
