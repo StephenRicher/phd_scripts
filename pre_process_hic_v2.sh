@@ -18,8 +18,8 @@ qc="${project}"/qc
 mkdir -p "${qc}"
 
 # TEMPORARILY MODIF PROJECT - THIS WILL BE UPDATED WHEN FILES ARE TRANSFERRED"
-proj=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis
-data_dir="${proj}"/raw_data
+#proj=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis
+data_dir="${project}"/data
 
 samples=( HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2 )
 
@@ -53,7 +53,8 @@ bowtie2-inspect --summary "${genome_index}" \
 fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*R[14].fastq.gz
 
 ## Run FastQ Screen on raw data ## UNTESTED####
-fastq_screen --aligner bowtie2 --threads 6 --outdir "${qc}" "${raw_data[@]}"
+fastq_screen --aligner bowtie2 --threads 6 --outdir "${qc}" \
+             "${data_dir}"/*R[14].fastq.gz
 
 ## Remove adapter contamination with cutadapt ##
 forward_adapter=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
@@ -79,7 +80,7 @@ parallel -j 12 \
 ## Run FastQC on adapter trimmed and truncated data ##
 fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*trim-trunc.fq.gz
 
-alignment_stats=alignment_stats.txt
+alignment_stats="${qc}"/alignment_stats.txt
 rm "${alignment_stats}"
 printf 'sample\ttotal_mapped_pairs\tboth_pairs_unmapped\t' >> "${alignment_stats}"
 printf 'r1_map_r2_unmapped\tr2_map_r1_unmapped\tduplicate_pairs\t' >> "${alignment_stats}"
@@ -111,8 +112,8 @@ for sample in "${samples[@]}"; do
 	r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
 	r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
 	unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
-	duplicate_pairs=$(sed -n '4p' "${qc}"/"${sample}".dedup_stats.txt | awk '{print $3/2}')
-	total_kept_pairs=$(samtools view -cf 64 "${data_dir}"/"${sample}".proc.bam)
+	duplicate_pairs=$(grep -m 1 'DUPLICATE' "${sample}".dedup_stats.txt | awk '{print $3/2}')
+	total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
 	qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
 	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -124,15 +125,25 @@ for sample in "${samples[@]}"; do
 	hictools extract \
 		--sample "${sample}" --gzip \
 		--log "${qc}"/"${sample}".extract.logfile \
-		<(samtools view -s 42.1 "${data_dir}"/"${sample}".proc.bam) \
-		>> "${qc}"/hic_filter_qc.txt
-
-	# CONFIRM THESE PARAMETERS!!!##
-	hictools filter \
-		--max_ditag 1000 --min_outward 1000 \
-		--log "${qc}"/"${sample}".filter.logfile \
-		"${data_dir}"/"${sample}".proc.bam
-		> "${data_dir}"/"${sample}".filt.bam
-
+		<(samtools view -hs 42.05 "${data_dir}"/"${sample}".proc.bam) \
+		>> "${qc}"/hic_filter_qc.txt.gz
 
 done
+
+# Remove any multiple headers in QC file
+zcat "${qc}"/hic_filter_qc.txt.gz \
+  | awk 'FNR==1 {header = $0; print} $0 != header' \
+  | gzip > "${qc}"/hic_filter_qc.tmp.txt.gz
+mv "${qc}"/hic_filter_qc.tmp.txt.gz "${qc}"/hic_filter_qc.txt.gz
+~/phd/scripts/plot_filter.R "${qc}"/hic_filter_qc.txt.gz "${qc}"
+
+# Map R1 and R2 reads
+for sample in "${samples[@]}"; do
+	hictools filter \
+      --min_ditag 100 --max_ditag 1000 \
+      --min_outward 1000 \
+      --log "${qc}"/"${sample}".filter.logfile \
+      "${data_dir}"/"${sample}".proc.bam \
+      > "${data_dir}"/"${sample}".filt.bam
+done
+
