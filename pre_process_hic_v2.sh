@@ -3,28 +3,16 @@
 shopt -s extglob
 export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
-## Function to record system memory usage ## 
-memlog() {
-	echo "      date     time $(free -m | grep total | sed -E 's/^    (.*)/\1/g')"
-	while true; do
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $(free -m | grep Mem: | sed 's/Mem://g')"
-    sleep 1
-	done
-}
-
 ## Set project directory ##
+capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
 project=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2
 qc="${project}"/qc
 mkdir -p "${qc}"
 
-# TEMPORARILY MODIF PROJECT - THIS WILL BE UPDATED WHEN FILES ARE TRANSFERRED"
-#proj=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis
 data_dir="${project}"/data
+mkdir -p "${data_dir}"
 
 samples=( HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2 )
-
-## Begin recording memory usage ##
-memlog > "${qc}"/memory_usage.logfile &
 
 ## Download reference genome ##
 build=GRCh38
@@ -54,28 +42,28 @@ fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*R[14].fastq.gz
 
 ## Run FastQ Screen on raw data ## UNTESTED####
 fastq_screen --aligner bowtie2 --threads 6 --outdir "${qc}" \
-             "${data_dir}"/*R[14].fastq.gz
+    "${data_dir}"/*R[14].fastq.gz
 
 ## Remove adapter contamination with cutadapt ##
 forward_adapter=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 reverse_adapter=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 parallel -j 12 \
-	"cutadapt -a "${forward_adapter}" -A "${reverse_adapter}" \
-    	--error-rate 0.1 --overlap 1 --gc-content 46 \
-    	--minimum-length 20 --quality-cutoff 20 \
-    	--output "${data_dir}"/{1}-R1-trim.fq.gz \
-    	--paired-output "${data_dir}"/{1}-R4-trim.fq.gz \
-    	"${data_dir}"/{1}-R1.fastq.gz \
-    	"${data_dir}"/{1}-R4.fastq.gz \
-    	> "${qc}"/{1}.cutadapt.txt" \
-	::: "${samples[@]}"
+    "cutadapt -a "${forward_adapter}" -A "${reverse_adapter}" \
+    --error-rate 0.1 --overlap 1 --gc-content 46 \
+    --minimum-length 20 --quality-cutoff 20 \
+    --output "${data_dir}"/{1}-R1-trim.fq.gz \
+    --paired-output "${data_dir}"/{1}-R4-trim.fq.gz \
+    "${data_dir}"/{1}-R1.fastq.gz \
+    "${data_dir}"/{1}-R4.fastq.gz \
+    > "${qc}"/{1}.cutadapt.txt" \
+  ::: "${samples[@]}"
 
 ## Truncate seqeuences at restriction ligation junction ##
 parallel -j 12 \
-	"hictools truncate --restriction ^GATC -zu {1} \
-    	> {=1 s/trim/trim-trunc/ =} \
-		2>> "${qc}"/hictools-truncate_summary.txt" \
-	::: "${data_dir}"/*trim.fq.gz
+    "hictools truncate --restriction ^GATC -zu {1} \
+    > {=1 s/trim/trim-trunc/ =} \
+    2>> "${qc}"/hictools-truncate_summary.txt" \
+  ::: "${data_dir}"/*trim.fq.gz
 
 ## Run FastQC on adapter trimmed and truncated data ##
 fastqc --threads 12 --outdir "${qc}" "${data_dir}"/*trim-trunc.fq.gz
@@ -89,44 +77,44 @@ printf 'quality_filtered_pairs\ttotal_pairs_retained\n' >> "${alignment_stats}"
 # Map R1 and R2 reads
 for sample in "${samples[@]}"; do
 
-	# File for intermediate logfile
-	intermediate="${data_dir}"/"${sample}".fixmate.bam
+    # File for intermediate logfile
+    intermediate="${data_dir}"/"${sample}".fixmate.bam
 
-	hictools map \
-		--index "${genome_index}"  \
-		--sample "${sample}"
-		--log "${qc}"/"${sample}".bowtie2.logfile \
-		--intermediate "${intermediate}" \
-		"${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
-		2> "${qc}"/"${sample}"_alignment_stats.txt \
-	| hictools deduplicate \
-		--log "${qc}"/"${sample}".dedup.logfile \
-		2> "${qc}"/"${sample}".dedup_stats.txt \
-	| hictools process \
-		--digest "${genome_digest}" \
-		--log "${qc}"/"${sample}".process.logfile \
-		> "${data_dir}"/"${sample}".proc.bam
+    hictools map \
+      --index "${genome_index}"  \
+      --sample "${sample}"
+      --log "${qc}"/"${sample}".bowtie2.logfile \
+      --intermediate "${intermediate}" \
+      "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
+      2> "${qc}"/"${sample}"_alignment_stats.txt \
+    | hictools deduplicate \
+        --log "${qc}"/"${sample}".dedup.logfile \
+        2> "${qc}"/"${sample}".dedup_stats.txt \
+    | hictools process \
+        --digest "${genome_digest}" \
+        --log "${qc}"/"${sample}".process.logfile \
+        > "${data_dir}"/"${sample}".proc.bam
 
-	total_pairs=$(grep -m 1 'reads; of these:' "${sample}".bowtie2_stats.txt | awk '{print $1}')
-	both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
-	r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
-	r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
-	unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
-	duplicate_pairs=$(grep -m 1 'DUPLICATE' "${sample}".dedup_stats.txt | awk '{print $3/2}')
-	total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
-	qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
+    total_pairs=$(grep -m 1 'reads; of these:' "${sample}".bowtie2_stats.txt | awk '{print $1}')
+    both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
+    r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
+    r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
+    unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
+    duplicate_pairs=$(grep -m 1 'DUPLICATE' "${sample}".dedup_stats.txt | awk '{print $3/2}')
+    total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
+    qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
-	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-		"${sample}" "${total_pairs}" "${both_pair_unmapped}" \
-		"${r1_map_r2_unmap}" "${r2_map_r1_unmap}" \
-		"${duplicate_pairs}" "${qual_filtered_pairs}" \
-		"${total_kept_pairs}" >> "${alignment_stats}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "${sample}" "${total_pairs}" "${both_pair_unmapped}" \
+      "${r1_map_r2_unmap}" "${r2_map_r1_unmap}" \
+      "${duplicate_pairs}" "${qual_filtered_pairs}" \
+      "${total_kept_pairs}" >> "${alignment_stats}"
 
-	hictools extract \
-		--sample "${sample}" --gzip \
-		--log "${qc}"/"${sample}".extract.logfile \
-		<(samtools view -hs 42.05 "${data_dir}"/"${sample}".proc.bam) \
-		>> "${qc}"/hic_filter_qc.txt.gz
+    hictools extract \
+      --sample "${sample}" --gzip \
+      --log "${qc}"/"${sample}".extract.logfile \
+      <(samtools view -hs 42.05 "${data_dir}"/"${sample}".proc.bam) \
+      >> "${qc}"/hic_filter_qc.txt.gz
 
 done
 
@@ -137,13 +125,83 @@ zcat "${qc}"/hic_filter_qc.txt.gz \
 mv "${qc}"/hic_filter_qc.tmp.txt.gz "${qc}"/hic_filter_qc.txt.gz
 ~/phd/scripts/plot_filter.R "${qc}"/hic_filter_qc.txt.gz "${qc}"
 
-# Map R1 and R2 reads
-for sample in "${samples[@]}"; do
-	hictools filter \
-      --min_ditag 100 --max_ditag 1000 \
-      --min_outward 1000 \
-      --log "${qc}"/"${sample}".filter.logfile \
-      "${data_dir}"/"${sample}".proc.bam \
-      > "${data_dir}"/"${sample}".filt.bam
-done
 
+hcx_dir="${data_dir}"/hicexplorer
+mkdir -p "${hcx_dir}"
+diffhic_dir="${data_dir}"/diffhic
+mkdir -p "${diffhic_dir}"
+
+summary_file="${hcx_dir}"/all_samples_summary.txt
+printf 'sample\tcapture_region\tvalid_hic_pairs\tregion_length\thic_pairs_per_kb\n' \
+  >> "${summary_file}"
+
+for sample in "${samples[@]}"; do
+
+  #hictools filter \
+  #  --min_ditag 100 --max_ditag 1000 \
+  #  --min_inward 1000 \
+  #  --log "${qc}"/"${sample}".filter.logfile \
+  #  "${data_dir}"/"${sample}".proc.bam \
+  #  > "${data_dir}"/"${sample}".filt.bam
+
+  samtools view -f 0x40 -b "${data_dir}"/"${sample}".filt.bam \
+    > "${data_dir}"/"${sample}".R1.filt.bam
+
+  samtools view -f 0x80 -b "${data_dir}"/"${sample}".filt.bam \
+    > "${data_dir}"/"${sample}".R2.filt.bam
+
+  # Extract SAM header and remove chromosome lines
+  samtools view -H "${data_dir}"/"${sample}".filt.bam \
+    | grep -v "@SQ" > "${diffhic_dir}"/"${sample}".custom_header.sam
+
+  while IFS=$'\t' read -r chr start end region; do
+
+    # For each region insert a modified chromosome header after line 1.
+    region_length=$((end - start))
+    sed -i "2i @SQ\tSN:${region}\tLN:${region_length}" \
+      "${diffhic_dir}"/"${sample}".custom_header.sam
+
+    sub_dir="${hcx_dir}"/all_regions/"${region}"/1000
+    mkdir -p "${sub_dir}"
+
+    hicBuildMatrix \
+      --samFiles "${data_dir}"/"${sample}".R1.filt.bam \
+                 "${data_dir}"/"${sample}".R2.filt.bam \
+      --region ${chr}:$((${start}+1))-${end} \
+      --binSize 1000 \
+      --outFileName ${sub_dir}/${sample}-${region}-1000.h5 \
+      --outBam ${sub_dir}/${sample}-${region}.bam \
+      --QCfolder ${sub_dir}/${sample}-${region}-1000_QC \
+      --skipDuplicationCheck \
+      --threads 6
+
+    # Correct SAM header to remove unused chromosomes.
+    cat <(samtools view -H ${sub_dir}/${sample}-${region}.bam \
+            | awk -v chr="@SQ\tSN:${chr}\t" '$0 ~ chr || /@HD/ || /@PG/') \
+         <(samtools view -S ${sub_dir}/${sample}-${region}.bam) \
+      | samtools view -Sb > ${sub_dir}/${sample}-${region}.tmp.bam
+    mv ${sub_dir}/${sample}-${region}.tmp.bam ${sub_dir}/${sample}-${region}.bam
+
+    # Generate modified region BAM file
+    samtools view ${sub_dir}/${sample}-${region}.bam \
+      | awk -v OFS='\t' -v chr="${chr}" -v len="${region_length}" -v start="${start}" -v region="${region}" '
+          {$3=region; $4=$4-start+1; $8=$8-start+1} {print}' \
+      >> "${diffhic_dir}"/"${sample}".captured.sam
+
+    read_count=$(($(samtools view -c ${sub_dir}/${sample}-${region}.bam) / 2))
+    hic_pairs_per_kb=$((${read_count} / (${region_length} / 1000)))
+    printf '%s\t%s\t%s\t%s\t%s\t\n' \
+      "${sample}" "${region}" "${read_count}" \
+      "${region_length}" "${hic_pairs_per_kb}" \
+      >> "${summary_file}"
+
+  done <${capture_regions}; wait
+
+  cat "${diffhic_dir}"/"${sample}".custom_header.sam \
+      "${diffhic_dir}"/"${sample}".captured.sam \
+    | samtools view -Sb > "${diffhic_dir}"/"${sample}".captured.bam \
+
+  rm "${data_dir}"/"${sample}".R[12].filt.bam
+  rm "${diffhic_dir}"/"${sample}".captured.sam
+
+done
