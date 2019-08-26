@@ -219,12 +219,13 @@ done
 
 while IFS=$'\t' read -r chr start end region; do
   for binsize in $(seq 1000 1000 10000); do
-    /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh -r "${region}" \
-                                                          -c "${chr}" \
-                                                          -s "${start}" \
-                                                          -e "${end}" \
-                                                          -b "${binsize}" \
-                                                          -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
+    /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh \
+      -r "${region}" \
+      -c "${chr}" \
+      -s "${start}" \
+      -e "${end}" \
+      -b "${binsize}" \
+      -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
   done
 done <"${capture_regions}"
 
