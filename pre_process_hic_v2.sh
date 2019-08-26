@@ -4,7 +4,7 @@ shopt -s extglob
 export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
 ## Set project directory ##
-capture_regions="/home/stephen/h/phd/scripts2/hic_scripts/capture_regions.bed"
+capture_regions="/home/stephen/phd/scripts/capture_regions.bed"
 project=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2
 qc="${project}"/qc
 mkdir -p "${qc}"
@@ -133,16 +133,27 @@ mkdir -p "${diffhic_dir}"
 
 summary_file="${hcx_dir}"/all_samples_summary.txt
 printf 'sample\tcapture_region\tvalid_hic_pairs\tregion_length\thic_pairs_per_kb\n' \
-  >> "${summary_file}"
+  > "${summary_file}"
+
+# Remove custom genome if it exists to prevent appending to existing.
+genome_no_path="${genome##*/}"
+custom_genome="${diffhic_dir}"/"${genome_no_path%.fa}".captured_regions.fa
+rm "${custom_genome}"
+# Create custom genome and rename FASTA header to region name.
+while IFS=$'\t' read -r chr start end region; do
+  samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
+    | sed "1 s/^.*$/>${region}/" \
+    >> "${custom_genome}"
+done <"${capture_regions}"
 
 for sample in "${samples[@]}"; do
 
-  #hictools filter \
-  #  --min_ditag 100 --max_ditag 1000 \
-  #  --min_inward 1000 \
-  #  --log "${qc}"/"${sample}".filter.logfile \
-  #  "${data_dir}"/"${sample}".proc.bam \
-  #  > "${data_dir}"/"${sample}".filt.bam
+  hictools filter \
+    --min_ditag 100 --max_ditag 1000 \
+    --min_inward 1000 \
+    --log "${qc}"/"${sample}".filter.logfile \
+    "${data_dir}"/"${sample}".proc.bam \
+    > "${data_dir}"/"${sample}".filt.bam
 
   samtools view -f 0x40 -b "${data_dir}"/"${sample}".filt.bam \
     > "${data_dir}"/"${sample}".R1.filt.bam
@@ -205,3 +216,15 @@ for sample in "${samples[@]}"; do
   rm "${diffhic_dir}"/"${sample}".captured.sam
 
 done
+
+while IFS=$'\t' read -r chr start end region; do
+  for binsize in $(seq 1000 1000 10000); do
+    /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh -r "${region}" \
+                                                          -c "${chr}" \
+                                                          -s "${start}" \
+                                                          -e "${end}" \
+                                                          -b "${binsize}" \
+                                                          -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
+  done
+done <"${capture_regions}"
+
