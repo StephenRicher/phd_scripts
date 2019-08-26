@@ -46,8 +46,8 @@ fi
 delete=()
 for sample in "${samples[@]}"; do
   matrix="${dir}"/1000/"${sample}"-"${region}"-1000.h5
-  # Check if exists since empty directories will return null glob
-  if [[ -f "${matrix}" ]]; then
+  # Check if exists (and not empty)
+  if [[ -s "${matrix}" ]]; then
     info=( $(hicInfo --matrices "${matrix}") )
     matrix_size=${info[13]/,/}
     matrix_sum=${info[19]/,/}
@@ -56,10 +56,14 @@ for sample in "${samples[@]}"; do
       >&2 echo "Removing "${sample}" from analysis due to insufficient interactions"
       delete+=("${sample}")
     fi
+  # If file exists but empty
+  elif [[ -f "${matrix}" ]]; then
+    delete+=("${sample}")
   fi
 done
 
-for target in "${delete[@]-*/}"; do
+# Delete sample group (i.e. HB2_WT)
+for target in "${delete[@]/-*/}"; do
   for i in "${!groups[@]}"; do
     if [[ ${groups[i]} = "${target}" ]]; then
       unset 'groups[i]'
@@ -87,8 +91,8 @@ if (( binsize > end - start )); then
 fi
 
 # Create new array so original is not overwritten
-groups2=( "${groups[@]}" )
-delete2=( "${delete[@]}" )
+#groups2=( "${groups[@]}" )
+#delete2=( "${delete[@]}" )
 
 mkdir -p "${dir}"/"${binsize}"
 
@@ -103,7 +107,7 @@ for matrix in "${matrices_norm[@]}"; do
 done
 
 mkdir -p "${dir}"/"${binsize}"/tads
-for group in "${groups2[@]}"; do
+for group in "${groups[@]}"; do
   hicSumMatrices --matrices "${dir}"/"${binsize}"/"${group}"*-norm.h5 \
                  --outFileName "${dir}"/"${binsize}"/"${group}"-"${region}"-"${binsize}"-norm_sum.h5
 
@@ -113,13 +117,16 @@ for group in "${groups2[@]}"; do
                                      -o "${dir}"/diagnostic_plots/${matrix_rmpath%.h5}_diagnostic.png \
       2> "${dir}"/diagnostic_plots/${matrix_rmpath%.h5}_diagnostic_log.txt
     lower_threshold=$(grep "mad threshold" "${dir}"/diagnostic_plots/"${matrix_rmpath%.h5}"_diagnostic_log.txt | awk '{print $NF}')
+    if [ -z "${lower_threshold}" ]; then
+      delete+=("${group}")
+      continue
+    fi
     hicCorrectMatrix correct --matrix "${matrix}" --correctionMethod ICE --iterNum 1000 \
                              --filterThreshold "${lower_threshold}" 5 --outFileName "${matrix%.h5}"_iced.h5
 
     # Catch errors with ICE correct - remove sample if unsuccessful
     if ! hicInfo --matrices "${matrix%.h5}"_iced.h5 2>/dev/null ; then
-      unset 'groups2[group]'
-      delete2+=("${group}")
+      delete+=("${group}")
       rm "${matrix%.h5}"_iced.h5
       continue
     fi
@@ -144,8 +151,18 @@ for group in "${groups2[@]}"; do
   done
 done
 
-if [ ${#groups2[@]} -eq 0 ]; then
-  continue
+# Remove groups that could not be iced
+for target in "${delete[@]/-*/}"; do
+  for i in "${!groups[@]}"; do
+    if [[ ${groups[i]} = "${target}" ]]; then
+      unset 'groups[i]'
+    fi
+  done
+done
+
+# Exit if no valid groups remain
+if [ ${#groups[@]} -eq 0 ]; then
+  exit 1
 fi
 
 # Correlate all normalised ICED matrices
@@ -155,8 +172,8 @@ hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
              --threads 6 --method pearson
 
 mkdir -p "${dir}"/"${binsize}"/matrix_comparison/
-for ((i=0; i < ${#groups2[@]}; i++)); do
-  group1="${groups2[i]}"
+for ((i=0; i < ${#groups[@]}; i++)); do
+  group1="${groups[i]}"
   hicCompareMatrices --matrices "${dir}"/"${binsize}"/"${group1}"*-norm_iced.h5 \
                      --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"-"${region}"_replicate-"${binsize}"_log2.h5 \
                      --operation log2ratio
@@ -165,8 +182,8 @@ for ((i=0; i < ${#groups2[@]}; i++)); do
                 --colorMap bwr --region ${plot_range} --dpi 300 --vMin -3 --vMax 3 \
                 --title "${group1}"-"${region}"_replicate_log2
 
-  for ((j=i+1; j < ${#groups2[@]}; j++)); do
-    group2="${groups2[j]}"
+  for ((j=i+1; j < ${#groups[@]}; j++)); do
+    group2="${groups[j]}"
       hicCompareMatrices --matrices "${dir}"/"${binsize}"/"${group1}"*-norm_sum_iced.h5 "${dir}"/"${binsize}"/"${group2}"*-norm_sum_iced.h5 \
                          --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
                          --operation log2ratio
@@ -182,10 +199,10 @@ norm_iced=( "${dir}"/"${binsize}"/*-norm_iced.h5 )
 norm_iced_sample=( ${norm_iced[@]##*/} )
 norm_iced_sample=( ${norm_iced_sample[@]/-${region}*} )
 hicPlotDistVsCounts --matrices "${norm_iced[@]}" \
-                    --plotFile  "${dir}"/counts_vs_dist/"${region}"_"${binsize}"_counts_vs_dist.png \
-                    --labels "${norm_iced_sample[@]}" \
-                    --maxdepth $(((end-start)/2)) \
-                    --plotsize 5 4.2
+  --plotFile  "${dir}"/counts_vs_dist/"${region}"_"${binsize}"_counts_vs_dist.png \
+  --labels "${norm_iced_sample[@]}" \
+  --maxdepth $(((end-start)/2)) \
+  --plotsize 5 4.2
 
 # Perform loop detection on unmerged and summed HiC matrices and plot. If no loops detected then run without the loops
 mkdir "${dir}"/"${binsize}"/hic_plots
@@ -290,7 +307,7 @@ for transform in count obs_exp; do
     full_dir="$(realpath "${dir}")"
     sed -i "s/directory/"${full_dir//\//\\/}"\/"${binsize}"/g" "${plot_track}"
 
-    for target in "${delete2[@]}"; do
+    for target in "${delete[@]}"; do
       sed -i "/Start "${target}"/,/End "${target}"/d" "${plot_track}"
     done
 
