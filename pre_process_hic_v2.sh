@@ -100,7 +100,7 @@ for sample in "${samples[@]}"; do
     r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
     r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
     unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
-    duplicate_pairs=$(grep -m 1 'DUPLICATE' "${sample}".dedup_stats.txt | awk '{print $3/2}')
+    duplicate_pairs=$(grep -m 1 'DUPLICATE' "${sample}".dedup_stats.txt | awk '{print $3}')
     total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
     qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
