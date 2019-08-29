@@ -96,7 +96,8 @@ fi
 
 mkdir -p "${dir}"/"${binsize}"
 
-for matrix in "${matrices_norm[@]}"; do
+# Merge raw and normalised matrices into a variety of bin sizes
+for matrix in "${matrices_norm[@]}" "${matrices[@]}"; do
   matrix_rmpath="${matrix##*/}" 
   matrix_rmpath="${matrix_rmpath/'-1000'/-${binsize}}"
   if [[ "${binsize}" != "1000" ]]; then
@@ -106,8 +107,22 @@ for matrix in "${matrices_norm[@]}"; do
   fi
 done
 
+# Reformat to (n+3)*n matrix for hicep
+for group in "${groups[@]}"; do
+  for matrix in "${dir}"/"${binsize}"/"${group}"-"${binsize}".h5; do
+    hicConvertFormat --matrices "${matrix}" \
+                     --inputFormat h5 --outputFormat homer \
+                     --outFileName /dev/stdout \
+      | zcat | sed 's/-/\t/g' | tail -n +2 \
+      | awk -v OFS='\t' -v bin="${binsize}" -v chr="${region}" '
+          {$0=gensub(/\s*\S+/,"",4); $1=chr; $2=(NR-1)*bin; $3=$2+bin; print}' \
+      > "${matrix%.h5}"_hicrep.tsv
+  done
+done
+
 mkdir -p "${dir}"/"${binsize}"/tads
 for group in "${groups[@]}"; do
+
   hicSumMatrices --matrices "${dir}"/"${binsize}"/"${group}"*-norm.h5 \
                  --outFileName "${dir}"/"${binsize}"/"${group}"-"${region}"-"${binsize}"-norm_sum.h5
 
@@ -134,6 +149,8 @@ for group in "${groups[@]}"; do
     hicConvertFormat --matrices "${matrix%.h5}"_iced.h5 \
                      --inputFormat h5 --outputFormat homer \
                      --outFileName "${matrix%.h5}"_iced.homer.gz
+
+    # Reformat to n*n matrix for OnTAD
     zcat "${matrix%.h5}"_iced.homer.gz | cut -f3- | tail -n+2 > "${matrix%.h5}"_iced.nn.txt
     OnTAD "${matrix%.h5}"_iced.nn.txt \
           -maxsz $((1000000/binsize)) \
@@ -143,11 +160,6 @@ for group in "${groups[@]}"; do
       | awk -v start="${start}" -v OFS='\t' '
           {$2=$2+start; $3=$3+start; $7=$7+start; $8=$8+start; print $1, $2, $3, $1, $7, $8, 0}' \
       > "${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}"_iced.links
-    hicConvertFormat --matrices "${matrix%.h5}"_iced.h5 \
-                     --inputFormat h5 \
-                     --outputFormat cool \
-                     --outFileName "${matrix%.h5}"_iced.cool \
-                     --resolutions "${binsize}"
   done
 done
 
