@@ -1,7 +1,15 @@
 library(hicrep)
+library(pheatmap)
+library(reshape2)
+library(RColorBrewer)
+library(igraph)
+library(ggplot2)
 
 data_dir = "/media/stephen/Data/hic_analysis_v2/hicexplorer/all_regions"
+
+# All hicrep output will be stored in a folder in qc directory
 qc_dir = "/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2/qc"
+dir.create(paste(qc_dir, 'hicrep', sep = '/'))
 
 capture_regions = read.csv("/home/stephen/phd/scripts/capture_regions.bed", sep = "\t", 
                            header = FALSE, col.names = c("chromosome", "start", "end", "region"))
@@ -13,16 +21,18 @@ scc_values <- data.frame("region" = character(0), "binsize" = numeric(0),
                          stringsAsFactors=FALSE)
 
 # Define sample names with replicate number
-samples = c("HB2_WT-1", "HB2_WT-2", "HB2_CL4-1", "HB2_CL4-2", "MCF7-1", "MCF7-2")
+samples = c("HB2_WT-1", "HB2_WT-2", "HB2_TSS-KO 1", "HB2_TSS-KO-2", "MCF7-1", "MCF7-2")
+
+binrange = seq(1000, 10000, 1000)
 
 for (region in capture_regions$region) {
   
   # Set max interaction as half capture region size
   start = capture_regions[capture_regions$region == region, "start"]
   end = capture_regions[capture_regions$region == region, "end"]
-  max_interaction = as.integer((end - start)/2)
+  max_interaction = min(1000000, as.integer((end - start)/2))
   
-  for (bin in rev(seq(1000, 10000, 1000))) {
+  for (bin in binrange) {
     h_hat = NULL
     sample_combinations = c()
     for (sample1 in samples) {
@@ -36,6 +46,7 @@ for (region in capture_regions$region) {
       m1 = read.csv(m1_path, sep = '\t', header = FALSE)
       for (sample2 in samples) {
         if (sample1 != sample2) {
+          next
           m2_path = paste(
             data_dir, "/", region, "/", bin, "/", sample2, "-", region, "-", bin, "_hicrep.tsv", 
             sep = "")
@@ -49,10 +60,12 @@ for (region in capture_regions$region) {
             print(
               paste('Calculating optimal smoothing parameter for region: ', region, ', bin: ', bin, '.', 
               sep = ""))
-            h_hat <- htrain(m1, m2, 
-                            resol = bin, 
-                            max = max_interaction, 
-                            range = 0:20)
+            tryCatch({h_hat <- htrain(m1, m2, 
+                                      resol = bin, 
+                                      max = max_interaction, 
+                                      range = 0:20)},
+                     error = function(e) {cat("ERROR :",conditionMessage(e), "\n"); h_hat = NULL})
+            
           }
           # h_hat will be NULL if HB2_WT-1 or HB2_WT-2 dont exists for region and bin
           if (is.null(h_hat)) {
@@ -92,11 +105,30 @@ for (region in capture_regions$region) {
             sep = ""))
           
           scc_values[nrow(scc_values) + 1,] = list(region, bin, sample1, sample2, h_hat, SCC.out$scc)
-          write.csv(scc_values, paste(qc_dir, "hicrep_scc_all.csv", sep = ""))
+          write.csv(scc_values, paste(qc_dir, 'hicrep/hicrep_scc_all.csv', sep = '/'))
+        } else {
+          scc_values[nrow(scc_values) + 1,] = list(region, bin, sample1, sample2, NA, 1)
         }
       }
     }
   }
 }
-write.csv(scc_values, paste(qc_dir, "hicrep_scc_all.csv", sep = ""))
+write.csv(scc_values, paste(qc_dir, 'hicrep/hicrep_scc_all.csv', sep = '/'))
 
+for (region in capture_regions$region) {
+  for (bin in binrange) {
+    subset = scc_values[scc_values$region == region & scc_values$binsize == bin, 
+                        c('sample1', 'sample2', 'scc')]
+    if (nrow(subset) == 0) {
+      next
+    }
+    g <- graph.data.frame(subset, directed=FALSE)
+    heatmap = pheatmap(get.adjacency(g, attr="scc", sparse=FALSE),
+                       color = viridis(100), display_numbers = TRUE,
+                       number_color = 'red', 
+                       fontsize = 8, fontsize_number = 10,
+                       angle_col = 0, treeheight_col = 0)
+    ggsave(paste(qc_dir, '/hicrep/hicrep-', region, '-', bin, '.png', sep = ''), 
+           plot = heatmap, width = 8, height = 5)
+  }
+}
