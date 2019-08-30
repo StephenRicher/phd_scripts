@@ -107,8 +107,10 @@ for matrix in "${matrices_norm[@]}" "${matrices[@]}"; do
   fi
 done
 
-# Reformat to (n+3)*n matrix for hicep
+mkdir -p "${dir}"/"${binsize}"/tads
 for group in "${groups[@]}"; do
+
+  # Reformat to (n+3)*n matrix for hicep
   for matrix in "${dir}"/"${binsize}"/"${group}"-"${binsize}".h5; do
     hicConvertFormat --matrices "${matrix}" \
                      --inputFormat h5 --outputFormat homer \
@@ -118,10 +120,6 @@ for group in "${groups[@]}"; do
           {$0=gensub(/\s*\S+/,"",4); $1=chr; $2=(NR-1)*bin; $3=$2+bin; print}' \
       > "${matrix%.h5}"_hicrep.tsv
   done
-done
-
-mkdir -p "${dir}"/"${binsize}"/tads
-for group in "${groups[@]}"; do
 
   hicSumMatrices --matrices "${dir}"/"${binsize}"/"${group}"*-norm.h5 \
                  --outFileName "${dir}"/"${binsize}"/"${group}"-"${region}"-"${binsize}"-norm_sum.h5
@@ -196,13 +194,13 @@ for ((i=0; i < ${#groups[@]}; i++)); do
 
   for ((j=i+1; j < ${#groups[@]}; j++)); do
     group2="${groups[j]}"
-      hicCompareMatrices --matrices "${dir}"/"${binsize}"/"${group1}"*-norm_sum_iced.h5 "${dir}"/"${binsize}"/"${group2}"*-norm_sum_iced.h5 \
-                         --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
-                         --operation log2ratio
-      hicPlotMatrix --matrix "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
-                    --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.png \
-                    --colorMap bwr --region ${plot_range} --dpi 300 --vMin -3 --vMax 3 \
-                    --title ${group1}_vs_${group2}-"${region}"_log2
+    hicCompareMatrices --matrices "${dir}"/"${binsize}"/"${group1}"*-norm_sum_iced.h5 "${dir}"/"${binsize}"/"${group2}"*-norm_sum_iced.h5 \
+                       --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
+                       --operation log2ratio
+    hicPlotMatrix --matrix "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
+                  --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.png \
+                  --colorMap bwr --region ${plot_range} --dpi 300 --vMin -3 --vMax 3 \
+                  --title ${group1}_vs_${group2}-"${region}"_log2
   done
 done
 
