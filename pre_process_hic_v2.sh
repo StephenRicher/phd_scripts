@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Move to hic_analysis environment
+eval "$(conda shell.bash hook)"
+conda activate hic_analysis
+
 shopt -s extglob
 export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
@@ -12,7 +16,7 @@ mkdir -p "${qc}"
 data_dir="${project}"/data
 mkdir -p "${data_dir}"
 
-samples=( HB2_CL4-1 HB2_CL4-2 HB2_WT-1 HB2_WT-2 MCF7-1 MCF7-2 )
+samples=( HB2_WT-1 HB2_WT-2 HB2_CL4-1 HB2_CL4-2 MCF7-1 MCF7-2 )
 
 ## Download reference genome ##
 build=GRCh38
@@ -217,6 +221,7 @@ for sample in "${samples[@]}"; do
 
 done
 
+# Run hicexplorer script
 while IFS=$'\t' read -r chr start end region; do
   for binsize in $(seq 1000 1000 10000); do
     /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh \
@@ -228,4 +233,36 @@ while IFS=$'\t' read -r chr start end region; do
       -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
   done
 done <"${capture_regions}"
+
+# Switch to py27 environment for hifive
+eval "$(conda shell.bash hook)"
+conda activate py27env
+
+# Run QUASAR-QC on all regions at multiple bin ranges
+# Define function to join sequence by char
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
+for sample in "${samples[@]}"; do
+  matrix="${diffhic_dir}"/"${sample}".captured.bam
+  hifive fends --length <(samtools view -H "${matrix}" | awk '$1 ~ /^@SQ/' | sed 's/:/ /g' | awk -v OFS='\t' '{print $3, $5}') \
+               --binned 1000 -g GRCh38 "${sample}".fend
+  hifive hic-data --bam <(samtools view -bf 0x40 "${matrix}") \
+                        <(samtools view -bf 0x80 "${matrix}") \
+                  --skip-duplicate-filtering \
+                  "${sample}".fend \
+                  "${sample}".hifive.mat
+  hifive hic-project "${sample}".hifive.mat \
+                     "${sample}".hifive.project
+  while IFS=$'\t' read -r chr start end region; do
+    hifive quasar -p "${sample}".hifive.project \
+                  -r $(join_by , $(seq 1000 1000 50000)) \
+                  -c "${region}" -o /dev/stdout -d 0 "${region}"-"${sample}".quasar \
+      | head -n 53 | tail -n +4 \
+      | awk -v region="${region}" -v sample="${sample}" '{print sample, $0, region}' \
+      >> "${qc}"/quasar_qc.txt
+    rm "${region}"-"${sample}".quasar
+  done <"${capture_regions}"
+  rm "${sample}".fend "${sample}".hifive.mat "${sample}".hifive.project
+done
+
 
