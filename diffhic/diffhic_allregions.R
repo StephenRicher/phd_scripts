@@ -3,7 +3,7 @@ library(edgeR)
 library(csaw)
 library(rhdf5)
 library(stringr)
-
+library(statmod).
 # Define directory and move to path
 path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/post_alignment/diffhic/"
 di_path=paste(path,"differential_interactions/", sep = "")
@@ -19,9 +19,9 @@ capture_regions = read.csv("/home/stephen/phd/scripts/capture_regions.bed", sep 
                            header = FALSE, col.names = c("chromosome", "start", "end", "region"))
 
 hicPlotTADs = "/home/stephen/miniconda3/bin/hicPlotTADs"
-track_template_path = "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_configs/"
-HB2_WT_vs_HB2_CL4_template.ini = paste(track_template_path, "diffhic_HB2_WTvsHB2_CL4.ini", sep = "")
-HB2_WT_vs_MCF7_template.ini = paste(track_template_path, "diffhic_HB2_WTvsMCF7.ini", sep = "")
+track_template_path = "/home/stephen/phd/scripts/pyGenomeTracks_configs/"
+HB2_WT_vs_HB2_CL4_template.ini = paste(track_template_path, "diffhic_HB2_WTvsHB2_CL4_tads.ini", sep = "")
+HB2_WT_vs_MCF7_template.ini = paste(track_template_path, "diffhic_HB2_WTvsMCF7_tads.ini", sep = "")
 
 
 # Samples to process.
@@ -102,7 +102,6 @@ lines(ab[o], fit$fitted[o], col="red")
 design <- model.matrix(~factor(c("HB2_WT","HB2_WT","HB2_CL4", "HB2_CL4", "MCF7", "MCF7"),
                                levels = c("HB2_WT", "HB2_CL4", "MCF7")))
 colnames(design) <- c("intercept", "HB2_CL4", "MCF7")
-
 
 # Convert to DGEList for edgeR
 y <- asDGEList(data)
