@@ -12,7 +12,6 @@ dir = args[2]
 if (!endsWith(dir, '/')) {
   dir = paste(dir, '/',  sep = '')
 }
-dir.create(paste(dir, 'capture_region_density', sep = ''))
 width = 10
 height = (9/16) * width
 
@@ -42,6 +41,6 @@ g = ggplot(data, aes(x = bin_range, y = nbins, colour = region)) +
        x = "Bin size (kb)", y = "Number of bins", caption = NULL) +
   theme_pubr(legend = "right", base_size = 12) +
   guides(colour = guide_legend(ncol = 1))
-ggsave(filename = paste(dir,'capture_region_density/nbins_by_binsize.png', sep = ''), 
+ggsave(filename = paste(dir,'nbins_by_binsize.png', sep = ''), 
        plot = g, 
        dpi = 300, width = width, height = height)
