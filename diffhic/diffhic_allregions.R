@@ -99,8 +99,10 @@ lines(ab[o], fit$fitted[o], col="red")
 ## Modelling Biological Variablity ##
 
 # Coef 2 measures HB2_WT vs HB2_CL4 and coef 3 measures HB2_WT vs MCF7
-design <- model.matrix(~factor(c("HB2_WT","HB2_WT","HB2_CL4", "HB2_CL4", "MCF7", "MCF7"),
-                               levels = c("HB2_WT", "HB2_CL4", "MCF7")))
+design <- model.matrix(
+  ~factor(c("HB2_WT","HB2_WT","HB2_CL4", "HB2_CL4", 
+            "MCF7", "MCF7"),
+          levels = c("HB2_WT", "HB2_CL4", "MCF7")))
 colnames(design) <- c("intercept", "HB2_CL4", "MCF7")
 
 # Convert to DGEList for edgeR
