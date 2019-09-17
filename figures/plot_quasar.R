@@ -53,7 +53,7 @@ for (region in unique(quasar_data$region)) {
                       colour = sample)) +
     geom_line() + geom_point() +
     scale_colour_brewer(name = NULL, palette = "Dark2") + 
-    labs(title = NULL, subtitle = NULL, tag = 'a)',
+    labs(title = NULL, subtitle = NULL, tag = NULL,
          x = "Bin size (kb)", y = "Quasar QC score", caption = NULL) +
     theme_pubr(legend = "bottom", base_size = 14) +
     guides(colour = guide_legend(nrow = 1))
@@ -62,15 +62,15 @@ for (region in unique(quasar_data$region)) {
                    aes(x = bin_range, y = nbins, colour = region)) + 
     geom_line() +
     scale_y_log10() +
-    labs(title = NULL, subtitle = NULL, tag = 'b)',
+    labs(title = NULL, subtitle = region, tag = NULL,
          x = "Bin size (kb)", y = "Number of bins", caption = NULL) +
     theme_pubr(base_size = 14) +
     theme(legend.position = "none")
   
   ggsave(filename = paste(outdir,'quasar_qc/quasar-', region, '.png', sep = ''), 
-         grid.arrange(rbind(ggplotGrob(quasar), 
-                            ggplotGrob(capture))), 
-         device = "png", dpi = 300, width = width, height = height * 2)
+         quasar, device = "png", dpi = 300, width = width, height = height)
+  ggsave(filename = paste(outdir,'quasar_qc/capture-', region, '.png', sep = ''), 
+         capture, device = "png", dpi = 300, width = width, height = height)
 }
 
 
