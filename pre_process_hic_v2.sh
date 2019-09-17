@@ -86,7 +86,7 @@ for sample in "${samples[@]}"; do
 
     hictools map \
       --index "${genome_index}"  \
-      --sample "${sample}"
+      --sample "${sample}" \
       --log "${qc}"/"${sample}".bowtie2.logfile \
       --intermediate "${intermediate}" \
       "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
@@ -156,8 +156,10 @@ for sample in "${samples[@]}"; do
     --min_ditag 100 --max_ditag 1000 \
     --min_inward 1000 \
     --log "${qc}"/"${sample}".filter.logfile \
+    --sample "${sample}" \
     "${data_dir}"/"${sample}".proc.bam \
-    > "${data_dir}"/"${sample}".filt.bam
+    > "${data_dir}"/"${sample}".filt.bam \
+    2>> "${qc}"/filter_statistics.tsv
 
   samtools view -f 0x40 -b "${data_dir}"/"${sample}".filt.bam \
     > "${data_dir}"/"${sample}".R1.filt.bam
