@@ -31,10 +31,9 @@ ggplot(filter_stats,
            fill = Filter)) + 
   geom_bar(position = 'fill', stat = 'identity') +
   facet_wrap(~Sample) +
-  #scale_fill_manual(values = brewer.pal(9,"Greys"),name = NULL) +
   scale_fill_manual(values = colours, name = NULL) +
   labs(title = NULL, subtitle = NULL, tag = NULL,
-       x = "Replicate", y = "Number of read pairs",
+       x = "Replicate", y = "Percentage of read pairs",
        caption = NULL) +
   theme_pubr(legend = "right") +
   guides(colour = guide_legend(nrow = 1)) +
