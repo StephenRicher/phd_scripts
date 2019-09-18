@@ -2,20 +2,23 @@
 # Download CTCF bigwig file from...
 # http://hgdownload.cse.ucsc.edu/gbdb/hg19/bbi/?C=D;O=D
 
+# Download GRCh38 GTF
+gtf="ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_29/gencode.v29.annotation.gtf.gz"
+awk -v OFS=$'\t' -F "\t|;|\"" '$3 == "gene" {print $1, $4, $5, $16, 0, $7}' <(curl "${gtf}" | zcat) > gencode.v29.annotation.bed
+
+# Remap files to GRCh38 genome
+for file in *.bigWig; do
+	CrossMap.py bigwig hg19ToHg38.over.chain.gz ${file} ${file%.*}_grch38.bw
+done
+
+make_tracks_file --trackFiles gencode.v29.annotation.bed wgEncodeUwTfbsMcf7CtcfStdRawRep1_grch38.bw.bw --out test.ini && pyGenomeTracks --tracks test.ini --region chr2:10,000,000-11,000,000 --outFileName nice_image.pdf
+
+
 # Convert GTF file to BED6 and include only gene names
-awk -v OFS=$'\t' -F "\t|;|\"" '$3 == "gene" {print $1, $4, $5, $16, 0, $7; print $3, $5 > gene_symbol_to_transcript_id}' gencode.v29.annotation.gtf > gencode.v29.annotation.bed
+#awk -v OFS=$'\t' -F "\t|;|\"" '$3 == "gene" {print $1, $4, $5, $16, 0, $7; print $3, $5 > gene_symbol_to_transcript_id}' gencode.v29.annotation.gtf > gencode.v29.annotation.bed
 
 # Extract gene symbol to transcript id conversion from GTF file
-awk -F "\t|;|\"" '!/^#/ && $3 == "transcript" {print $13, $19}' gencode.v29.annotation.gtf > transcript_id_to_gene_symbol.txt
+#awk -F "\t|;|\"" '!/^#/ && $3 == "transcript" {print $13, $19}' gencode.v29.annotation.gtf > transcript_id_to_gene_symbol.txt
 
 # Whole gene BED file downloaded from UCSC table browser (format compatible with HiC explorer) Convert transcript_id to gene symbol
-awk -v OFS='\t' 'NR==FNR{a[$1]=$2;next}{$4=a[$4]; print}' transcript_id_to_gene_symbol.txt gencode.v29.annotation.transcripts.bed > gencode.v29.annotation.transcipts_symbol.bed
-
-make_tracks_file --trackFiles HB2_CL4_1_GNG12_AS1_DIRAS3_10000.h5 TAD_test_domains.bed ../grch38_gene_symbol.sorted.bed TAD_test_tad_score.bm --out test.ini
-
-# Rempap files to GRCh38 genome
-for file in *.bigWig; do
-	CrossMap.py bigwig hg19ToHg38.over.chain.gz ${file} ${file%.*}_grch38.bw &
-done; wait
-
-
+#awk -v OFS='\t' 'NR==FNR{a[$1]=$2;next}{$4=a[$4]; print}' transcript_id_to_gene_symbol.txt gencode.v29.annotation.transcripts.bed > gencode.v29.annotation.transcipts_symbol.bed
