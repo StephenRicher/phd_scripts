@@ -25,7 +25,8 @@ mkdir -p "${genome_dir}"
 genome_ftp=ftp://ftp.ensembl.org/pub/release-97/fasta/homo_sapiens/dna/\
 Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
 genome="${genome_dir}"/"${genome_ftp##*/}"
-curl "${genome_ftp}" > "${genome}"
+genome="${genome%.gz}"
+curl "${genome_ftp}" | zcat -f > "${genome}"
 
 ## Generate restriction digest ##
 genome_digest="${genome_dir}"/"${build}"_Mbo1-digest.txt.gz
