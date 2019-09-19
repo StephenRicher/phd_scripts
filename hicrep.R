@@ -27,7 +27,7 @@ binrange = seq(1000, 10000, 1000)
 
 for (region in capture_regions$region) {
   
-  # Set max interaction as half capture region size
+  # Set max interaction as half capture region size, or 1,000,000bp
   start = capture_regions[capture_regions$region == region, "start"]
   end = capture_regions[capture_regions$region == region, "end"]
   max_interaction = min(1000000, as.integer((end - start)/2))
