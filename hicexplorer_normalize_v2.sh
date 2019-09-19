@@ -22,10 +22,6 @@ samples=("${@}")
 # Get group name (i.e. without replicate) from sample name
 groups=($(printf "%s\n" "${samples[@]/-*/}" | sort -u | tr '\n' ' '))
 
-#tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad.ini" \
-#        "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad_sum.ini" \ 
-#        "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_hitad.ini" \
-#        "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_hitad_sum.ini")
 tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad.ini" \
         "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad_sum.ini")
 
@@ -111,7 +107,7 @@ mkdir -p "${dir}"/"${binsize}"/tads
 for group in "${groups[@]}"; do
 
   # Reformat to (n+3)*n matrix for hicep
-  for matrix in "${dir}"/"${binsize}"/"${group}"-"${binsize}".h5; do
+  for matrix in "${dir}"/"${binsize}"/"${group}"*"${binsize}".h5; do
     hicConvertFormat --matrices "${matrix}" \
                      --inputFormat h5 --outputFormat homer \
                      --outFileName /dev/stdout \
@@ -189,17 +185,20 @@ for ((i=0; i < ${#groups[@]}; i++)); do
                      --operation log2ratio
   hicPlotMatrix --matrix "${dir}"/"${binsize}"/matrix_comparison/"${group1}"-"${region}"_replicate-"${binsize}"_log2.h5 \
                 --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"-"${region}"_replicate-"${binsize}"_log2.png \
-                --colorMap bwr --region ${plot_range} --dpi 300 --vMin -3 --vMax 3 \
+                --colorMap bwr --region "${chr}":"${start}"-"${end}" --dpi 300 --vMin -3 --vMax 3 \
                 --title "${group1}"-"${region}"_replicate_log2
 
-  for ((j=i+1; j < ${#groups[@]}; j++)); do
+  for ((j=0; j < ${#groups[@]}; j++)); do
     group2="${groups[j]}"
+    if [ "${group1}" == "${group2}" ]; then
+      continue
+    fi
     hicCompareMatrices --matrices "${dir}"/"${binsize}"/"${group1}"*-norm_sum_iced.h5 "${dir}"/"${binsize}"/"${group2}"*-norm_sum_iced.h5 \
                        --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
                        --operation log2ratio
     hicPlotMatrix --matrix "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
                   --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.png \
-                  --colorMap bwr --region ${plot_range} --dpi 300 --vMin -3 --vMax 3 \
+                  --colorMap bwr --region "${chr}":"${start}"-"${end}" --dpi 300 --vMin -3 --vMax 3 \
                   --title ${group1}_vs_${group2}-"${region}"_log2
   done
 done
@@ -260,17 +259,17 @@ for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 done
 
 montage "${dir}"/"${binsize}"/hic_plots/*-norm_iced.png \
-        -geometry 1200x1200+1+1 -tile 2x \
+        -geometry +0+0 -tile 2x \
         "${dir}"/"${binsize}"/hic_plots/${region}_${binsize}_hic_plots.png
 montage "${dir}"/"${binsize}"/hic_plots/*-norm_sum_iced.png \
-        -geometry 1200x1200+1+1 -tile x1 \
+        -geometry +0+0 -tile x1 \
         "${dir}"/"${binsize}"/hic_plots/${region}-${binsize}-sum_hic_plots.png
 montage "${dir}"/"${binsize}"/hic_plots_obs_exp/*-norm_iced_obs_exp.png \
-        -geometry 1200x1200+1+1 -tile 2x \
-        "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}_${binsize}_hic_plots.png
+        -geometry +0+0 -tile 2x \
+        "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}_${binsize}_hic_plots_obs_exp.png
 montage "${dir}"/"${binsize}"/hic_plots_obs_exp/*-norm_sum_iced_obs_exp.png \
-        -geometry 1200x1200+1+1 -tile x1 \
-        "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}-${binsize}-sum_hic_plots.png
+        -geometry +0+0 -tile x1 \
+        "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}-${binsize}-sum_hic_plots_obs_exp.png
 
 #for group in "${groups[@]}"; do
 #  for type in "norm.h5" "norm_sum.h5"; do
@@ -349,7 +348,10 @@ for transform in count obs_exp; do
     sed -i "s/#max_value = none/max_value = ${max_hic_value}/g" "${plot_track}"
 
     # Replot the graph.
-    hicPlotTADs --tracks "${plot_track}" --region ${plot_range} --outFileName "${plotname}" --title ${region} --dpi 300
+    hicPlotTADs --tracks "${plot_track}" --region ${plot_range} \
+                --outFileName "${plotname}" \
+                --title "${region}"'at '"${binsize}"'kb bin size' \
+                --dpi 300
 
     rm "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
   done
