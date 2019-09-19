@@ -241,19 +241,19 @@ for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 
   if [ -f "${loops_file}" ]; then
     hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${binsize}"/hic_plots/${matrix_rmpath/.h5}.png \
-                  --colorMap PuRd --log1p --region ${plot_range} --loops "${loops_file}" \
+                  --colorMap YlGn --log1p --region "${chr}":"${start}"-"${end}" --loops "${loops_file}" \
                   --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
     hicPlotMatrix --matrix "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5 \
                   --outFileName "${dir}"/"${binsize}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
-                  --colorMap bwr --region ${plot_range} --loops "${loops_file}" --vMin 0 \
+                  --colorMap YlGn --region "${chr}":"${start}"-"${end}" --loops "${loops_file}" \
                   --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
   else
     hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${binsize}"/hic_plots/${matrix_rmpath/.h5}.png \
-                  --colorMap PuRd --log1p --region ${plot_range} \
+                  --colorMap YlGn --log1p --region "${chr}":"${start}"-"${end}" \
                   --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
     hicPlotMatrix --matrix "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5 \
                   --outFileName "${dir}"/"${binsize}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
-                  --colorMap bwr --region ${plot_range} --vMin 0 \
+                  --colorMap YlGn --region "${chr}":"${start}"-"${end}" \
                   --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
   fi
 done
