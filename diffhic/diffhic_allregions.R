@@ -137,13 +137,13 @@ for (coef in c(2, 3)) {
       if (comp == "HB2_CL4") {
         pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template_tads.ini 
       } else {
-        pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template_tads.ini
+        pyGenome_template.ini = HB2_WT_vs_MCF7_template_tads.ini
       }
     } else {
       if (comp == "HB2_CL4") {
         pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template.ini 
       } else {
-        pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template.ini
+        pyGenome_template.ini = HB2_WT_vs_MCF7_template.ini
       }
     }
     
