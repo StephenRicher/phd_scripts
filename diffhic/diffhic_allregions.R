@@ -3,10 +3,12 @@ library(edgeR)
 library(csaw)
 library(rhdf5)
 library(stringr)
-library(statmod).
+library(statmod)
 # Define directory and move to path
 path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/post_alignment/diffhic/"
+path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2/data/diffhic/"
 di_path=paste(path,"differential_interactions/", sep = "")
+dir.create(di_path)
 setwd(path)
 
 # Whole genome sequence - FASTA headers have been modified to ensure they only contain chromosomes.
@@ -18,7 +20,7 @@ hs.param <- pairParam(hs.frag)
 capture_regions = read.csv("/home/stephen/phd/scripts/capture_regions.bed", sep = "\t", 
                            header = FALSE, col.names = c("chromosome", "start", "end", "region"))
 
-hicPlotTADs = "/home/stephen/miniconda3/bin/hicPlotTADs"
+hicPlotTADs = "/home/stephen/anaconda3/envs/hic_analysis/bin/hicPlotTADs"
 track_template_path = "/home/stephen/phd/scripts/pyGenomeTracks_configs/"
 HB2_WT_vs_HB2_CL4_template_tads.ini = paste(track_template_path, "diffhic_HB2_WTvsHB2_CL4_tads.ini", sep = "")
 HB2_WT_vs_MCF7_template_tads.ini = paste(track_template_path, "diffhic_HB2_WTvsMCF7_tads.ini", sep = "")
@@ -27,7 +29,7 @@ HB2_WT_vs_MCF7_template.ini = paste(track_template_path, "diffhic_HB2_WTvsMCF7.i
 
 
 # Samples to process.
-samples = c("HB2_WT_1", "HB2_WT_2", "HB2_CL4_1", "HB2_CL4_2", "MCF7_1", "MCF7_2")
+samples = c("HB2_WT-1", "HB2_WT-2", "HB2_CL4-1", "HB2_CL4-2", "MCF7-1", "MCF7-2")
 
 # Generate HiC matrix of trans interactions within capture regions.
 for (sample in samples) {
