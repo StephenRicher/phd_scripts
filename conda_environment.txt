@@ -1,6 +1,4 @@
-conda create --name hic_analysis python=3 \
-  hicexplorer=3 samtools bowtie2 bcftools setuptools numpy scipy matplotlib scikit-learn cooler pomegranate=0.10.0 networkx=1 
+eval "$(conda shell.bash hook)"
 
-
-
-
+conda create --name hic_analysis python=3.7 
+conda install hicexplorer -c bioconda -c conda-forge
