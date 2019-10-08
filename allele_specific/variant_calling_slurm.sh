@@ -20,15 +20,7 @@ module load samtools/1.9
 
 sample=${1}; shift
 
-# Set out-directory as same directory as first BAM file provided.
-if [[ ${1} == *"/"* ]]; then
-  outdir=${1%/*}
-else
-  outdir="."
-fi
-
-echo ${outdir}
-
+outdir="."
 genome="/home/u/sr467/scratch/projects/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 regions="/home/u/sr467/scripts/hic_scripts/capture_regions.bed"
 hapcompass="/home/u/sr467/scripts/hic_scripts/hapcompass_v0.8.2/hapcompass.jar"
