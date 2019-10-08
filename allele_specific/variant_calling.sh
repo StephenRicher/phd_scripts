@@ -97,18 +97,18 @@ awk -v OFS=$'\t' 'substr($10,1,3)=="0|1" {print $3, $1, $2, 1, $4"/"$5} substr($
 
 ## Masked reference genome at SNPs and build bowtie2 index ##
 
-genome_rmpath="${genome##*/}"
-masked_genome="${out}"/"${genome_rmpath%.fa?(.gz)}"_${sample}_masked.fa.gz
-masked_genome_index="${out}"/GRCh38_"${sample}"
+#genome_rmpath="${genome##*/}"
+#masked_genome="${out}"/"${genome_rmpath%.fa?(.gz)}"_${sample}_masked.fa.gz
+#masked_genome_index="${out}"/GRCh38_"${sample}"
 
-bedtools maskfasta \
-  -fullHeader \
-  -fi <(zcat -f "${genome}") \
-  -bed ${sample}_all_regions_hapcompass_MWER_solution.txt.vcf \
-  -fo /dev/stdout \
-| gzip > "${masked_genome}"
+#bedtools maskfasta \
+#  -fullHeader \
+#  -fi <(zcat -f "${genome}") \
+#  -bed ${sample}_all_regions_hapcompass_MWER_solution.txt.vcf \
+#  -fo /dev/stdout \
+#| gzip > "${masked_genome}"
 
-bowtie2-build \
-  --threads "${threads}" \
-  "${masked_genome}" \
-  "${mask_genome_index}" 
+#bowtie2-build \
+#  --threads "${threads}" \
+#  "${masked_genome}" \
+#  "${mask_genome_index}" 
