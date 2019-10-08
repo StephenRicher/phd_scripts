@@ -177,6 +177,21 @@ hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
              --outFileNameScatter "${dir}"/correlation_plots/${region}-"${binsize}"-scatter.png \
              --threads 6 --method pearson
 
+
+for matrix in "${dir}"/"${binsize}"/*-norm_sum_iced.h5; do
+
+  matrix_rmpath="${matrix##*/}"
+
+  hicFindTADs --matrix "${matrix}" \
+            --minDepth $((binsize*3)) \
+            --maxDepth $((binsize*10)) \
+            --step "${binsize}" \
+            --outPrefix "${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}" \
+            --correctForMultipleTesting fdr
+
+done
+
+
 mkdir -p "${dir}"/"${binsize}"/matrix_comparison/
 for ((i=0; i < ${#groups[@]}; i++)); do
   group1="${groups[i]}"
@@ -200,6 +215,12 @@ for ((i=0; i < ${#groups[@]}; i++)); do
                   --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.png \
                   --colorMap bwr --region "${chr}":"${start}"-"${end}" --dpi 300 --vMin -3 --vMax 3 \
                   --title ${group1}_vs_${group2}-"${region}"_log2
+
+    # Subtract tad insulation score from matrices between samples
+    ~/phd/scripts/subtract-tads.py "${dir}"/"${binsize}"/tads/"${group1}"-"${region}"-"${binsize}"*tad_score.bm \
+                                   "${dir}"/"${binsize}"/tads/"${group2}"-"${region}"-"${binsize}"*tad_score.bm \
+    > "${dir}"/"${binsize}"/tads/"${group1}"-minus-"${group2}"-"${region}"-"${binsize}"-tad_score.bm
+
   done
 done
 
@@ -223,8 +244,6 @@ vMax_sum=$(hicInfo --matrices "${dir}"/"${binsize}"/*-norm_sum_iced.h5 | grep Ma
 vMax_not_sum=$(hicInfo --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 | grep Maximum | cut -d ':' -f 2 | sort -r | head -n 1)
 
 for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
-
-  matrix_rmpath="${matrix##*/}"
 
   hicTransform -m "${matrix}" --method obs_exp -o "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5
 
@@ -350,7 +369,7 @@ for transform in count obs_exp; do
     # Replot the graph.
     hicPlotTADs --tracks "${plot_track}" --region ${plot_range} \
                 --outFileName "${plotname}" \
-                --title "${region}"'at '"${binsize}"'kb bin size' \
+                --title "${region}"' at '"${binsize}"'kb bin size' \
                 --dpi 300
 
     rm "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
