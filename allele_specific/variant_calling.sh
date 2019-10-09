@@ -34,16 +34,26 @@ if [ ! -f "${genome}".fai ] ; then
 fi
 
 # Merge coordinate sorted replicates. This is run first to ensure all threads are available from bcftools.
-samtools merge -@ ${threads} \
-  ${out}/${sample}.replicate_merge.bam "${@}"
-samtools index -@ ${threads} \
-  ${out}/${sample}.replicate_merge.bam
+
+if [ ! -f "${out}"/"${sample}".replicate_merge.bam ]; then
+  samtools merge -@ ${threads} - "${@}" \
+  | samtools sort -m 2G -@ ${threads} \
+  > ${out}/${sample}.replicate_merge.bam
+fi
+
+if [ ! -f "${out}"/"${sample}".replicate_merge.bam.bai ]; then
+  samtools index -@ ${threads} \
+    ${out}/${sample}.replicate_merge.bam
+fi
 
 # Call variants from merged sample file and quality filter.
+
+if [ ! -f "${out}"/"${sample}".sorted.vcf.gz ]; then
+
 bcftools mpileup \
   -q 15 --ignore-RG --count-orphans \
   --max-depth 100000 \
-  --output-type u
+  --output-type u \
   -f "${genome}" \
   --regions-file ${capture_regions} \
   "${out}"/"${sample}".replicate_merge.bam \
@@ -59,23 +69,20 @@ bcftools mpileup \
     --output-file ${out}/${sample}.sorted.vcf.gz \
     --output-type z
 
+fi
 bcftools index ${out}/${sample}.sorted.vcf.gz
 	
 # Subset VCF by capture region and perform haplotype phasing.
-N=2
 while IFS=$'\t' read -r chr start end region; do
-  ((i=i%N)); ((i++==0)) && wait
-  {
   bcftools view \
     --output-type v \
     --regions ${chr}:$((${start}+1))-${end} \
     ${out}/${sample}.sorted.vcf.gz \
     > ${out}/${sample}_${region}.vcf
-  java -Xmx30g -jar ${hapcompass} \
+  java -Xmx50g -jar ${hapcompass} \
     --bam ${out}/${sample}.replicate_merge.bam \
     --vcf ${out}/${sample}_${region}.vcf \
     --output ${out}/${sample}_${region}_hapcompass
-  } &
 done <"${capture_regions}"
 
 MWER_solution_all="${out}/${sample}_all_hapcompass_MWER_solution.txt"
