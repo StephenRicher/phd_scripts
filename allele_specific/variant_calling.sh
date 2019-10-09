@@ -47,37 +47,35 @@ if [ ! -f "${out}"/"${sample}".replicate_merge.bam.bai ]; then
 fi
 
 # Call variants from merged sample file and quality filter.
-
-if [ ! -f "${out}"/"${sample}".sorted.vcf.gz ]; then
-
-bcftools mpileup \
-  -q 15 --ignore-RG --count-orphans \
-  --max-depth 100000 \
-  --output-type u \
-  -f "${genome}" \
-  --regions-file ${capture_regions} \
-  "${out}"/"${sample}".replicate_merge.bam \
-| bcftools call \
-    --skip-variants indels \
-    --multiallelic-caller \
-    --variants-only \
+vcf_out="${out}"/"${sample}".sorted.vcf.gz
+if [ ! -f "${vcf_out}" ]; then
+  bcftools mpileup \
+    -q 15 --ignore-RG --count-orphans \
+    --max-depth 100000 \
     --output-type u \
-| bcftools view \
-    -i '%QUAL>=20' \
-    --output-type u \
-| bcftools sort \
-    --output-file ${out}/${sample}.sorted.vcf.gz \
-    --output-type z
-
+    -f "${genome}" \
+    --regions-file ${capture_regions} \
+    "${out}"/"${sample}".replicate_merge.bam \
+  | bcftools call \
+      --skip-variants indels \
+      --multiallelic-caller \
+      --variants-only \
+      --output-type u \
+  | bcftools view \
+      -i '%QUAL>=20' \
+      --output-type u \
+  | bcftools sort \
+      --output-file "${vcf_out}" \
+      --output-type z
 fi
-bcftools index ${out}/${sample}.sorted.vcf.gz
+bcftools index "${vcf_out}"
 	
 # Subset VCF by capture region and perform haplotype phasing.
 while IFS=$'\t' read -r chr start end region; do
   bcftools view \
     --output-type v \
     --regions ${chr}:$((${start}+1))-${end} \
-    ${out}/${sample}.sorted.vcf.gz \
+    "${vcf_out}" \
     > ${out}/${sample}_${region}.vcf
   java -Xmx50g -jar ${hapcompass} \
     --bam ${out}/${sample}.replicate_merge.bam \
@@ -86,7 +84,7 @@ while IFS=$'\t' read -r chr start end region; do
 done <"${capture_regions}"
 
 MWER_solution_all="${out}/${sample}_all_hapcompass_MWER_solution.txt"
-rm ${MWER_solution_all}
+rm "${MWER_solution_all}"
 while IFS=  read -r -d $'\0' file; do
   # Get line number of header of top scoring section
   top_score_line=$(grep -n BLOCK ${file} | sort -k 6 -nr | cut -f 1 -d ':' | head -n 1)
@@ -95,11 +93,11 @@ while IFS=  read -r -d $'\0' file; do
 done < <(find ${out} -type f -name "${sample}_*_hapcompass_MWER_solution.txt" -print0)
 
 # Convert solution to VCF for genome masking
-java -jar ${hc2vcf} ${MWER_solution_all_regions} <(gunzip -c ${out}/${sample}.sorted.vcf.gz) 2 true
+java -jar ${hc2vcf} "${MWER_solution_all}" <(gunzip -c "${vcf_out}") 2 true
 	
 # Convert VCF to SNPsplit friendly output
 awk -v OFS=$'\t' 'substr($10,1,3)=="0|1" {print $3, $1, $2, 1, $4"/"$5} substr($10,1,3)=="1|0" {print $3, $1, $2, 1, $5"/"$4}' \
-  ${MWER_solution_all_regions}.vcf \
+  "${MWER_solution_all}".vcf \
   > ${out}/${sample}_MWER_solution_snpsplit.txt
 
 ## Masked reference genome at SNPs and build bowtie2 index ##
