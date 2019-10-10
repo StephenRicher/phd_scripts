@@ -77,9 +77,10 @@ while IFS=$'\t' read -r chr start end region; do
     --regions ${chr}:$((${start}+1))-${end} \
     "${vcf_out}" \
     > ${out}/${sample}_${region}.vcf
-  java -Xmx50g -jar ${hapcompass} \
+  java -Xmx100g -jar ${hapcompass} \
     --bam ${out}/${sample}.replicate_merge.bam \
     --vcf ${out}/${sample}_${region}.vcf \
+    --debug \
     --output ${out}/${sample}_${region}_hapcompass
 done <"${capture_regions}"
 
@@ -116,4 +117,4 @@ awk -v OFS=$'\t' 'substr($10,1,3)=="0|1" {print $3, $1, $2, 1, $4"/"$5} substr($
 #bowtie2-build \
 #  --threads "${threads}" \
 #  "${masked_genome}" \
-#  "${mask_genome_index}" 
+#  "${mask_genome_index}"
