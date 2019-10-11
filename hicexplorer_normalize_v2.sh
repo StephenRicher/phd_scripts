@@ -3,7 +3,7 @@
 # Activate extended globbing
 shopt -s extglob
 
-while getopts 'r:c:s:e:b:d:' flag; do
+while getopts 'r:c:s:e:b:d:a' flag; do
   case "${flag}" in
     r) region="${OPTARG}" ;;
     c) chr="${OPTARG%/}" ;;
@@ -11,6 +11,7 @@ while getopts 'r:c:s:e:b:d:' flag; do
     e) end="${OPTARG}" ;;
     b) binsize="${OPTARG}" ;;
     d) dir="${OPTARG}" ;;
+    a) allele=true ;;
     *) print_usage
        exit 1 ;;
   esac
@@ -22,8 +23,13 @@ samples=("${@}")
 # Get group name (i.e. without replicate) from sample name
 groups=($(printf "%s\n" "${samples[@]/-*/}" | sort -u | tr '\n' ' '))
 
-tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad.ini" \
-        "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad_sum.ini")
+if [ "${allele}" = true ]; then
+  tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_G1vsG2_ontad.ini" \
+          "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_G1vsG2_ontad_sum.ini")
+else
+  tracks=("/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad.ini" \
+          "/home/stephen/phd/scripts/pyGenomeTracks_configs/hicexplorer_WTvsCL4vsMCF7_ontad_sum.ini")
+fi
 
 # Define plot region - set maximum plot region size
 max_size=1500000
