@@ -14,7 +14,7 @@ capture_regions="/home/stephen/phd/scripts/capture_regions.bed"
 # Unmasked genome
 unmasked_genome="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 # Set genome digest (from unmasked genome
-masked_genome_digest="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/GRCh38_Mbo1-digest.txt.gz"
+unmasked_genome_digest="/home/stephen/x_db/DBuck/s_richer/stephen_test/genomes/GRCh38/GRCh38_Mbo1-digest.txt.gz"
 # Set masked genome index
 masked_genome_index="${allele_dir}"/GRCh38_HB2_WT
 
@@ -62,9 +62,18 @@ for sample in "${samples[@]}"; do
         --log "${qc}"/"${sample}".dedup.logfile \
         2> "${qc}"/"${sample}".dedup_stats.txt \
     | hictools process \
-        --digest "${masked_genome_digest}" \
+        --digest "${unmasked_genome_digest}" \
         --log "${qc}"/"${sample}".process.logfile \
         > "${allele_dir}"/"${sample}".proc.bam
+
+    hictools filter \
+      --min_ditag 100 --max_ditag 1000 \
+      --min_inward 1000 \
+      --log "${qc}"/"${sample}".filter.logfile \
+      --sample "${sample}" \
+      "${allele_dir}"/"${sample}".proc.bam \
+      > "${allele_dir}"/"${sample}".filt.bam \
+      2>> "${qc}"/filter_statistics.tsv
 
     total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".bowtie2_stats.txt | awk '{print $1}')
     both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
@@ -72,7 +81,7 @@ for sample in "${samples[@]}"; do
     r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
     unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
     duplicate_pairs=$(grep -m 1 'DUPLICATE' "${qc}"/"${sample}".dedup_stats.txt | awk '{print $3}')
-    total_kept_pairs=$(samtools view -cf 64 "${sample}".proc.bam)
+    total_kept_pairs=$(samtools view -cf 64 "${allele_dir}"/"${sample}".proc.bam)
     qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -81,25 +90,12 @@ for sample in "${samples[@]}"; do
       "${duplicate_pairs}" "${qual_filtered_pairs}" \
       "${total_kept_pairs}" >> "${alignment_stats}"
 
-    hictools extract \
-      --sample "${sample}" --gzip \
-      --log "${qc}"/"${sample}".extract.logfile \
-      <(samtools view -hs 42.05 "${allele_dir}"/"${sample}".proc.bam) \
-      >> "${qc}"/hic_filter_qc.txt.gz
-
     ~/phd/scripts/allele_specific/SNPsplit.pl \
       --snp_file "${snpsplit}" \
       --hic \
-      "${allele_dir}"/"${sample}".proc.bam
+      "${allele_dir}"/"${sample}".filt.bam
 
 done
-
-# Remove any multiple headers in QC file
-zcat "${qc}"/hic_filter_qc.txt.gz \
-  | awk 'FNR==1 {header = $0; print} $0 != header' \
-  | gzip > "${qc}"/hic_filter_qc.tmp.txt.gz
-mv "${qc}"/hic_filter_qc.tmp.txt.gz "${qc}"/hic_filter_qc.txt.gz
-~/phd/scripts/plot_filter.R "${qc}"/hic_filter_qc.txt.gz "${qc}"
 
 hcx_dir="${allele_dir}"/hicexplorer
 mkdir -p "${hcx_dir}"
@@ -125,16 +121,7 @@ done <"${capture_regions}"
 # Also must track file for hicexplorer normalise
 exit 1
 
-for sample in "${samples[@]}"; do
-
-  hictools filter \
-    --min_ditag 100 --max_ditag 1000 \
-    --min_inward 1000 \
-    --log "${qc}"/"${sample}".filter.logfile \
-    --sample "${sample}" \
-    "${allele_dir}"/"${sample}".proc.bam \
-    > "${allele_dir}"/"${sample}".filt.bam \
-    2>> "${qc}"/filter_statistics.tsv
+for sample in "${allele_samples[@]}"; do
 
   samtools view -f 0x40 -b "${allele_dir}"/"${sample}".filt.bam \
     > "${allele_dir}"/"${sample}".R1.filt.bam
@@ -200,13 +187,14 @@ done
 
 # Run hicexplorer script
 while IFS=$'\t' read -r chr start end region; do
-  for binsize in $(seq 1000 2000 20000); do
+  for binsize in $(seq 1000 1000 20000); do
     /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh \
       -r "${region}" \
       -c "${chr}" \
       -s "${start}" \
       -e "${end}" \
       -b "${binsize}" \
+      -a \
       -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
   done
 done <"${capture_regions}"
