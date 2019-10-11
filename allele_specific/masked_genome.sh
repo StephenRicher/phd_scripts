@@ -14,8 +14,8 @@ while getopts 's:g:v:o:t:' flag; do
   case "${flag}" in
     s) sample="${OPTARG}" ;;
     g) genome="${OPTARG}" ;;
-    v) vcf="${OTARG}" ;;
-    o) out="${OPTARG}" ;;
+    v) vcf="${OPTARG}" ;;
+    o) out="${OPTARG%/}" ;;
     t) threads="${OPTARG}" ;;
     *) print_usage
        exit 1 ;;
@@ -24,7 +24,7 @@ done
 
 # If genome is not indexed then raise error.
 if [ ! -f "${genome}".fai ] ; then
-  echo "Genome must be indexed."; exit 
+  samtools faidx "${genome}"
 fi
 
 ## Masked reference genome at SNPs and build bowtie2 index ##
