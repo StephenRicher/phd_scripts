@@ -21,3 +21,4 @@ module load bowtie2
 sample=${1}
 
 mpirun /home/u/sr467/scratch/projects/HiC/allele_specific/hic_dir/run_hictools.sh "${sample}"
+

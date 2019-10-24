@@ -57,7 +57,7 @@ for sample in "${samples[@]}"; do
       --intermediate "${intermediate}" \
       --sensitivity sensitive \
       "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
-      2> "${qc}"/"${sample}"_alignment_stats.txt \
+      2> "${qc}"/"${sample}".alignment_stats.txt \
     | hictools deduplicate \
         --log "${qc}"/"${sample}".dedup.logfile \
         2> "${qc}"/"${sample}".dedup_stats.txt \
@@ -75,7 +75,7 @@ for sample in "${samples[@]}"; do
       > "${allele_dir}"/"${sample}".filt.bam \
       2>> "${qc}"/filter_statistics.tsv
 
-    total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".bowtie2_stats.txt | awk '{print $1}')
+    total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".alignment_stats.txt | awk '{print $1}')
     both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
     r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
     r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
@@ -95,6 +95,11 @@ for sample in "${samples[@]}"; do
       --hic \
       "${allele_dir}"/"${sample}".filt.bam
 
+    for a in 1 2; do
+      samtools merge -n "${sample/-*/_G${a}-${sample/*-/}}".bam \
+      "${sample}"*G"${a}"_[GU]["${a}"A].bam
+    done
+
 done
 
 hcx_dir="${allele_dir}"/hicexplorer
@@ -107,30 +112,27 @@ printf 'sample\tcapture_region\tvalid_hic_pairs\tregion_length\thic_pairs_per_kb
   > "${summary_file}"
 
 # Remove custom genome if it exists to prevent appending to existing.
-genome_no_path="${genome##*/}"
+genome_no_path="${unmasked_genome##*/}"
 custom_genome="${diffhic_dir}"/"${genome_no_path%.fa}".captured_regions.fa
 rm "${custom_genome}"
 # Create custom genome and rename FASTA header to region name.
 while IFS=$'\t' read -r chr start end region; do
-  samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
+  samtools faidx "${unmasked_genome}" "${chr}":$((start+1))-"${end}" \
     | sed "1 s/^.*$/>${region}/" \
     >> "${custom_genome}"
 done <"${capture_regions}"
 
-# Before here we must redefine samples and ensure the SNPsplit output is correctly named with HB2_WT_G1-1 HB2_WT_G2-1
-# Also must track file for hicexplorer normalise
-exit 1
 
 for sample in "${allele_samples[@]}"; do
 
-  samtools view -f 0x40 -b "${allele_dir}"/"${sample}".filt.bam \
-    > "${allele_dir}"/"${sample}".R1.filt.bam
+  samtools view -f 0x40 -b "${allele_dir}"/"${sample}".bam \
+    > "${allele_dir}"/"${sample}".R1.bam
 
-  samtools view -f 0x80 -b "${allele_dir}"/"${sample}".filt.bam \
-    > "${allele_dir}"/"${sample}".R2.filt.bam
+  samtools view -f 0x80 -b "${allele_dir}"/"${sample}".bam \
+    > "${allele_dir}"/"${sample}".R2.bam
 
   # Extract SAM header and remove chromosome lines
-  samtools view -H "${allele_dir}"/"${sample}".filt.bam \
+  samtools view -H "${allele_dir}"/"${sample}".bam \
     | grep -v "@SQ" > "${diffhic_dir}"/"${sample}".custom_header.sam
 
   while IFS=$'\t' read -r chr start end region; do
@@ -144,8 +146,8 @@ for sample in "${allele_samples[@]}"; do
     mkdir -p "${sub_dir}"
 
     hicBuildMatrix \
-      --samFiles "${allele_dir}"/"${sample}".R1.filt.bam \
-                 "${allele_dir}"/"${sample}".R2.filt.bam \
+      --samFiles "${allele_dir}"/"${sample}".R1.bam \
+                 "${allele_dir}"/"${sample}".R2.bam \
       --region ${chr}:$((${start}+1))-${end} \
       --binSize 1000 \
       --outFileName ${sub_dir}/${sample}-${region}-1000.h5 \
@@ -174,20 +176,20 @@ for sample in "${allele_samples[@]}"; do
       "${region_length}" "${hic_pairs_per_kb}" \
       >> "${summary_file}"
 
-  done <${capture_regions}; wait
+  done <${capture_regions}
 
   cat "${diffhic_dir}"/"${sample}".custom_header.sam \
       "${diffhic_dir}"/"${sample}".captured.sam \
     | samtools view -Sb > "${diffhic_dir}"/"${sample}".captured.bam \
 
-  rm "${allele_dir}"/"${sample}".R[12].filt.bam
-  rm "${allele_dir}"/"${sample}".captured.sam
+  rm "${allele_dir}"/"${sample}".R[12].bam
+  rm "${diffhic_dir}"/"${sample}".captured.sam
 
 done
 
 # Run hicexplorer script
 while IFS=$'\t' read -r chr start end region; do
-  for binsize in $(seq 1000 1000 20000); do
+  for binsize in $(seq 5000 1000 20000); do
     /home/stephen/phd/scripts/hicexplorer_normalize_v2.sh \
       -r "${region}" \
       -c "${chr}" \
@@ -195,7 +197,7 @@ while IFS=$'\t' read -r chr start end region; do
       -e "${end}" \
       -b "${binsize}" \
       -a \
-      -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
+      -d "${hcx_dir}"/all_regions/"${region}" "${allele_samples[@]}"
   done
 done <"${capture_regions}"
 

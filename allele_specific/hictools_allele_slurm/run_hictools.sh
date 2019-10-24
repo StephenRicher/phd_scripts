@@ -26,7 +26,7 @@ intermediate="${allele_dir}"/"${sample}".fixmate.bam
   --sensitivity sensitive \
   -@ 16 \
   "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
-  2> "${qc}"/"${sample}"_alignment_stats.txt \
+  2> "${qc}"/"${sample}".alignment_stats.txt \
 | "${hictools}" deduplicate \
   --log "${qc}"/"${sample}".dedup.logfile \
   -@ 16 \
@@ -36,7 +36,7 @@ intermediate="${allele_dir}"/"${sample}".fixmate.bam
   --log "${qc}"/"${sample}".process.logfile \
   > "${allele_dir}"/"${sample}".proc.bam
 
-hictools filter \
+"${hictools}" filter \
   --min_ditag 100 --max_ditag 1000 \
   --min_inward 1000 \
   --log "${qc}"/"${sample}".filter.logfile \
@@ -45,7 +45,7 @@ hictools filter \
   > "${allele_dir}"/"${sample}".filt.bam \
   2>> "${qc}"/filter_statistics.tsv
 
-total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".bowtie2_stats.txt | awk '{print $1}')
+total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".alignment_stats.txt | awk '{print $1}')
 both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
 r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
 r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
@@ -65,3 +65,7 @@ printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
   --hic \
   "${allele_dir}"/"${sample}".filt.bam
 
+for a in 1 2; do
+  samtools merge -n "${sample/-*/_G${a}-${sample/*-/}}".bam \
+    "${sample}"*G"${a}"_[GU]["${a}"A].bam
+done

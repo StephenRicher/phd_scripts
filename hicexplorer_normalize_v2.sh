@@ -89,7 +89,7 @@ mkdir -p "${dir}"/correlation_plots "${dir}"/diagnostic_plots "${dir}"/counts_vs
 
 # Skip if bin size is larger than the region
 if (( binsize > end - start )); then
-  continue
+  exit 1
 fi
 
 # Create new array so original is not overwritten
@@ -184,9 +184,12 @@ hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
              --threads 6 --method pearson
 
 
-for matrix in "${dir}"/"${binsize}"/*-norm_sum_iced.h5; do
+for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 
   matrix_rmpath="${matrix##*/}"
+  # Create file for tad score to ensure file exists (in case no TADs found)
+  # Otherise HiCPlotTads raises error
+  touch "${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}"_tad_score.bm
 
   hicFindTADs --matrix "${matrix}" \
             --minDepth $((binsize*3)) \
@@ -251,12 +254,18 @@ vMax_not_sum=$(hicInfo --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 | grep Ma
 
 for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 
+  matrix_rmpath="${matrix##*/}"
+
   hicTransform -m "${matrix}" --method obs_exp -o "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5
 
   loops_file="${dir}"/"${binsize}"/loops/${matrix_rmpath/.h5}_loops.bedgraph
-  hicDetectLoops --matrix ${matrix} -o "${loops_file}" \
+  timeout 5m hicDetectLoops --matrix ${matrix} -o "${loops_file}" \
                  --minLoopDistance "${binsize}" --maxLoopDistance 1000000 --windowSize 10 --peakWidth 6 \
                  --pValuePreselection 0.05 --pValue 0.5 --peakInteractionsThreshold 20
+  
+  if [[ "$?" == 124 ]]; then
+    >&2 echo "Error timeout on hicDetectLoops ${matrix}"
+  fi
 
   if [[ "${matrix}" == *"_sum_"* ]]; then
     vMax=${vMax_sum}
@@ -366,7 +375,7 @@ for transform in count obs_exp; do
     fi
 
     # Plot track first to identifiy max HiC value across all HiC matrices.
-    hicPlotTADs --tracks "${plot_track}" --region ${plot_range} --outFileName "${plotname}" --dpi 300 2> "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
+    hicPlotTADs --tracks "${plot_track}" --region ${plot_range} --outFileName "${plotname}" --dpi 50 2> "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
 
     # Extract max value from hicPlotTADs outut and insert to new temp track.ini file.
     max_hic_value=$(grep "max values for track" "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt | awk '{print $NF}' | sort -nr | head -n 1)
@@ -375,8 +384,8 @@ for transform in count obs_exp; do
     # Replot the graph.
     hicPlotTADs --tracks "${plot_track}" --region ${plot_range} \
                 --outFileName "${plotname}" \
-                --title "${region}"' at '"${binsize}"'kb bin size' \
-                --dpi 300
+                --title "${region}"' at '"$((binsize/1000))"'kb bin size' \
+                --dpi 600
 
     rm "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
   done

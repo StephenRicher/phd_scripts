@@ -23,9 +23,7 @@ track_template_path = "/home/stephen/h/phd/scripts2/hic_scripts/pyGenomeTracks_c
 G1_vs_G2_template.ini = paste(track_template_path, "diffhic_G1vsG2.ini", sep = "")
 
 # Samples to process.
-samples = c("HB2_WT_G1-1",  "HB2_WT_G2-1", "HB2_WT_G1-2", "HB2_WT_G2-2", 
-            "HB2_CL4_G1-1", "HB2_CL4_G2-1", "HB2_CL4_G1-2", "HB2_CL4_G2-2",
-            "MCF7_G1-1", "MCF7_G2-1", "MCF7_G1-2", "MCF7_G2-2") 
+samples = c("HB2_WT_G1-1",  "HB2_WT_G2-1", "HB2_WT_G1-2", "HB2_WT_G2-2") 
 
 # Generate HiC matrix of trans interactions within capture regions.
 for (sample in samples) {

@@ -9,7 +9,7 @@ export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
 ## Set project directory ##
 capture_regions="/home/stephen/phd/scripts/capture_regions.bed"
-project=/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2
+project=/home/stephen/x_db/DBuck/s_richer/hic_01/
 qc="${project}"/qc
 mkdir -p "${qc}"
 
@@ -91,7 +91,7 @@ for sample in "${samples[@]}"; do
       --log "${qc}"/"${sample}".bowtie2.logfile \
       --intermediate "${intermediate}" \
       "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
-      2> "${qc}"/"${sample}"_alignment_stats.txt \
+      2> "${qc}"/"${sample}".alignment_stats.txt \
     | hictools deduplicate \
         --log "${qc}"/"${sample}".dedup.logfile \
         2> "${qc}"/"${sample}".dedup_stats.txt \
@@ -100,7 +100,7 @@ for sample in "${samples[@]}"; do
         --log "${qc}"/"${sample}".process.logfile \
         > "${data_dir}"/"${sample}".proc.bam
 
-    total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".bowtie2_stats.txt | awk '{print $1}')
+    total_pairs=$(grep -m 1 'reads; of these:' "${qc}"/"${sample}".alignment_stats.txt | awk '{print $1}')
     both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
     r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
     r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
@@ -129,7 +129,6 @@ zcat "${qc}"/hic_filter_qc.txt.gz \
   | gzip > "${qc}"/hic_filter_qc.tmp.txt.gz
 mv "${qc}"/hic_filter_qc.tmp.txt.gz "${qc}"/hic_filter_qc.txt.gz
 ~/phd/scripts/plot_filter.R "${qc}"/hic_filter_qc.txt.gz "${qc}"
-
 
 hcx_dir="${data_dir}"/hicexplorer
 mkdir -p "${hcx_dir}"
