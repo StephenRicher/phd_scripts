@@ -3,7 +3,7 @@
 # Activate extended globbing
 shopt -s extglob
 
-while getopts 'r:c:s:e:b:d:a' flag; do
+while getopts 'r:c:s:e:b:d:a:t:' flag; do
   case "${flag}" in
     r) region="${OPTARG}" ;;
     c) chr="${OPTARG%/}" ;;
@@ -12,11 +12,14 @@ while getopts 'r:c:s:e:b:d:a' flag; do
     b) binsize="${OPTARG}" ;;
     d) dir="${OPTARG}" ;;
     a) allele=true ;;
-    *) print_usage
+    t) threads="${OPTARG}" ;;
+    *) print_usage 
        exit 1 ;;
   esac
 done
 shift "$((OPTIND-1))"
+
+export NUMEXPR_MAX_THREADS="${threads}"
 
 samples=("${@}")
 
@@ -187,9 +190,10 @@ hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
 for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 
   matrix_rmpath="${matrix##*/}"
-  # Create file for tad score to ensure file exists (in case no TADs found)
-  # Otherise HiCPlotTads raises error
-  touch "${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}"_tad_score.bm
+
+  # Delete any empty file (see touc below) otherwise hicFindTADs breaks
+  tad_score_bedgraph="${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}"_tad_score.bm
+  rm "${tad_score_bedgraph}"
 
   hicFindTADs --matrix "${matrix}" \
             --minDepth $((binsize*3)) \
@@ -197,6 +201,11 @@ for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
             --step "${binsize}" \
             --outPrefix "${dir}"/"${binsize}"/tads/"${matrix_rmpath%.h5}" \
             --correctForMultipleTesting fdr
+
+  # If no tads found create empty file so hicPlotTads doesn't break
+  if [ ! -f "${tad_score_bedgraph}" ]; then
+    touch "${tad_score_bedgraph}"
+  fi
 
 done
 
