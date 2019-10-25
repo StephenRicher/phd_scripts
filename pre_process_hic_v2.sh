@@ -232,6 +232,7 @@ while IFS=$'\t' read -r chr start end region; do
       -s "${start}" \
       -e "${end}" \
       -b "${binsize}" \
+      -t 4 \
       -d "${hcx_dir}"/all_regions/"${region}" "${samples[@]}"
   done
 done <"${capture_regions}"
