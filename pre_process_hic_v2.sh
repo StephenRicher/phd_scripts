@@ -30,7 +30,7 @@ curl "${genome_ftp}" | zcat -f > "${genome}"
 
 ## Generate restriction digest ##
 genome_digest="${genome_dir}"/"${build}"_Mbo1-digest.txt.gz
-hictools digest --log "${qc}"/"${build}"_Mbo1-digest.logfile \
+pyHiCTools digest --log "${qc}"/"${build}"_Mbo1-digest.logfile \
   --restriction ^GATC -zu "${genome}" > "${genome_digest}"
 
 ## Generate bowtie2 index and inspect ## 
@@ -65,9 +65,9 @@ parallel -j 12 \
 
 ## Truncate seqeuences at restriction ligation junction ##
 parallel -j 12 \
-    "hictools truncate --restriction ^GATC -zu {1} \
+    "pyHiCTools truncate --restriction ^GATC -zu {1} \
     > {=1 s/trim/trim-trunc/ =} \
-    2>> "${qc}"/hictools-truncate_summary.txt" \
+    2>> "${qc}"/pyHiCTools-truncate_summary.txt" \
   ::: "${data_dir}"/*trim.fq.gz
 
 ## Run FastQC on adapter trimmed and truncated data ##
@@ -85,17 +85,17 @@ for sample in "${samples[@]}"; do
     # File for intermediate logfile
     intermediate="${data_dir}"/"${sample}".fixmate.bam
 
-    hictools map \
+    pyHiCTools map \
       --index "${genome_index}"  \
       --sample "${sample}" \
       --log "${qc}"/"${sample}".bowtie2.logfile \
       --intermediate "${intermediate}" \
       "${data_dir}"/"${sample}"-R[14]-trim-trunc.fq.gz \
       2> "${qc}"/"${sample}".alignment_stats.txt \
-    | hictools deduplicate \
+    | pyHiCTools deduplicate \
         --log "${qc}"/"${sample}".dedup.logfile \
         2> "${qc}"/"${sample}".dedup_stats.txt \
-    | hictools process \
+    | pyHiCTools process \
         --digest "${genome_digest}" \
         --log "${qc}"/"${sample}".process.logfile \
         > "${data_dir}"/"${sample}".proc.bam
@@ -115,7 +115,7 @@ for sample in "${samples[@]}"; do
       "${duplicate_pairs}" "${qual_filtered_pairs}" \
       "${total_kept_pairs}" >> "${alignment_stats}"
 
-    hictools extract \
+    pyHiCTools extract \
       --sample "${sample}" --gzip \
       --log "${qc}"/"${sample}".extract.logfile \
       <(samtools view -hs 42.05 "${data_dir}"/"${sample}".proc.bam) \
@@ -152,7 +152,7 @@ done <"${capture_regions}"
 
 for sample in "${samples[@]}"; do
 
-  hictools filter \
+  pyHiCTools filter \
     --min_ditag 100 --max_ditag 1000 \
     --min_inward 1000 \
     --log "${qc}"/"${sample}".filter.logfile \
