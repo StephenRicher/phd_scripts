@@ -4,9 +4,9 @@ library(csaw)
 library(rhdf5)
 library(stringr)
 library(statmod)
+
 # Define directory and move to path
-path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2/data/diffhic/"
-path="/media/stephen/Data/hic_allele/diffhic/"
+path="/home/stephen/x_db/DBuck/s_richer/hic_01/allele_specific/diffhic/"
 di_path=paste(path,"differential_interactions/", sep = "")
 dir.create(di_path)
 setwd(path)
@@ -16,14 +16,12 @@ genome = paste(path, "Homo_sapiens.GRCh38.dna.primary_assembly.captured_regions.
 hs.frag = cutGenome(genome, "GATC", 4)
 hs.param <- pairParam(hs.frag)
 
-
 capture_regions = read.csv("/home/stephen/phd/scripts/capture_regions.bed", sep = "\t", 
                            header = FALSE, col.names = c("chromosome", "start", "end", "region"))
 
 hicPlotTADs = "/home/stephen/anaconda3/envs/hic_analysis/bin/hicPlotTADs"
 track_template_path = "/home/stephen/phd/scripts/pyGenomeTracks_configs/"
 HB2_WT-G1_vsG2_template_tads.ini == ""
-
 
 # Samples to process.
 samples = c("HB2_WT_G1-1",  "HB2_WT_G2-1", "HB2_WT_G1-2", "HB2_WT_G2-2") 
@@ -100,7 +98,7 @@ lines(ab[o], fit$fitted[o], col="red")
 # Coef 2 measures HB2_WT vs HB2_CL4 and coef 3 measures HB2_WT vs MCF7
 
 ## Modelling Biological Variablity ##
-sample <- factor(c("1", "1", "2", "2"))
+sample <- factor(c("HB2_WT-1", "HB2_WT-1", "HB2_WT-2", "HB2_WT-2"))
 genome <- factor(c("G1", "G2", "G1", "G2"), levels = c("G1", "G2"))
 design <- model.matrix(~sample+genome)
 
@@ -112,74 +110,65 @@ plotMDS(y)
 fit <- glmQLFit(y, design, robust=TRUE)
 plotQLDisp(fit)
 
-  result <- glmQLFTest(fit)
-  rowData(data) <- cbind(rowData(data), result$table)
+result <- glmQLFTest(fit)
+rowData(data) <- cbind(rowData(data), result$table)
   
-  clustered.sig <- diClusters(data, result$table, target=0.01, cluster.args=list(tol=1))
-  useful.cols <- as.vector(outer(c("seqnames", "start", "end"), 1:2, paste0))
-  tabcom <- combineTests(clustered.sig$indices[[1]], result$table)
-  tabbest <- getBestTest(clustered.sig$indices[[1]], result$table)
-  tabstats <- data.frame(tabcom[,1:4], logFC=tabbest$logFC, FDR=clustered.sig$FDR)
-  results.d <- as.data.frame(clustered.sig$interactions)[,useful.cols]
-  results.d <- cbind(results.d, tabstats)
-  o.d <- order(results.d$PValue)
-  write.table(results.d[o.d,], file = paste(di_path, "HB2_WT-vs-", comp, ".tsv", sep = ""), sep="\t",quote=FALSE, row.names=FALSE)
+clustered.sig <- diClusters(data, result$table, target=0.01, cluster.args=list(tol=1))
+useful.cols <- as.vector(outer(c("seqnames", "start", "end"), 1:2, paste0))
+tabcom <- combineTests(clustered.sig$indices[[1]], result$table)
+tabbest <- getBestTest(clustered.sig$indices[[1]], result$table)
+tabstats <- data.frame(tabcom[,1:4], logFC=tabbest$logFC, FDR=clustered.sig$FDR)
+results.d <- as.data.frame(clustered.sig$interactions)[,useful.cols]
+results.d <- cbind(results.d, tabstats)
+o.d <- order(results.d$PValue)
+write.table(results.d[o.d,], file = paste(di_path, "HB2_WT_G1-vs-HB2_WT_G2.tsv", sep = ""), sep="\t",quote=FALSE, row.names=FALSE)
   
-  for (tads in c('tads', 'logFC')) {
-    if (tads == 'tads') {
-      if (comp == "HB2_CL4") {
-        pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template_tads.ini 
-      } else {
-        pyGenome_template.ini = HB2_WT_vs_MCF7_template_tads.ini
-      }
-    } else {
-      if (comp == "HB2_CL4") {
-        pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template.ini 
-      } else {
-        pyGenome_template.ini = HB2_WT_vs_MCF7_template.ini
-      }
-    }
+for (tads in c('tads', 'logFC')) {
+  if (tads == 'tads') {
+    pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template_tads.ini 
+  } else {
+    pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template.ini
+  }
     
-    for (region in capture_regions$region) {
+  for (region in capture_regions$region) {
+    chromosome = capture_regions[capture_regions$region == region, "chromosome"]
+    start = capture_regions[capture_regions$region == region, "start"]
+    end = capture_regions[capture_regions$region == region, "end"]
+    location = paste(chromosome, start+1, end, sep = "-")
       
-      chromosome = capture_regions[capture_regions$region == region, "chromosome"]
-      start = capture_regions[capture_regions$region == region, "start"]
-      end = capture_regions[capture_regions$region == region, "end"]
-      location = paste(chromosome, start+1, end, sep = "-")
+    region_results.d = results.d[results.d$seqnames1 == region,]
       
-      region_results.d = results.d[results.d$seqnames1 == region,]
-      
-      if (nrow(region_results.d) != 0) {
-        region_results.d[,c("start2", "end2","start1", "end1")] = region_results.d[,c("start2", "end2","start1", "end1")] + start
-        region_results.d[,c("seqnames1", "seqnames2")] = chromosome
-        arc=region_results.d[,c("seqnames2","start2", "end2", "seqnames1","start1", "end1", "logFC")]
+    if (nrow(region_results.d) != 0) {
+      region_results.d[,c("start2", "end2","start1", "end1")] = region_results.d[,c("start2", "end2","start1", "end1")] + start
+      region_results.d[,c("seqnames1", "seqnames2")] = chromosome
+      arc=region_results.d[,c("seqnames2","start2", "end2", "seqnames1","start1", "end1", "logFC")]
         
-        pyGenome.ini = paste(di_path, "HB2_WT_vs_", comp, "-", region, "-", bin.size, "-", tads,".ini", sep = "")
+      pyGenome.ini = paste(di_path, "HB2_WT_vs_", comp, "-", region, "-", bin.size, "-", tads,".ini", sep = "")
         
-        system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
+      system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
         
-        # Remove section for config file if no significant UP/DOWN interactions detected.
-        if (nrow(arc[arc$logFC < -2,]) != 0) {
-          write.table(arc[arc$logFC < -2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
-                      row.names = FALSE, col.names = FALSE)
-        } else {
-          system(paste("sed -i '/Start DI_Down/,/End DI_Down/d' ", pyGenome.ini, sep = ""))
+      # Remove section for config file if no significant UP/DOWN interactions detected.
+      if (nrow(arc[arc$logFC < -2,]) != 0) {
+        write.table(arc[arc$logFC < -2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
+                    row.names = FALSE, col.names = FALSE)
+      } else {
+        system(paste("sed -i '/Start DI_Down/,/End DI_Down/d' ", pyGenome.ini, sep = ""))
+      }
+      if (nrow(arc[arc$logFC > 2,]) != 0) {
+        write.table(arc[arc$logFC > 2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
+                    row.names = FALSE, col.names = FALSE)
+      } else {
+        system(paste("sed -i '/Start DI_Up/,/End DI_Up/d' ", pyGenome.ini, sep = ""))
+        # Replace line below # DI_Down share axis with height config to prevent overlap with HiC map.
+        system(paste("sed -i '/# DI_Down share axis/{n;s/.*/height = 10/}' ", pyGenome.ini, sep = ""))
         }
-        if (nrow(arc[arc$logFC > 2,]) != 0) {
-          write.table(arc[arc$logFC > 2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
-                      row.names = FALSE, col.names = FALSE)
-        } else {
-          system(paste("sed -i '/Start DI_Up/,/End DI_Up/d' ", pyGenome.ini, sep = ""))
-          # Replace line below # DI_Down share axis with height config to prevent overlap with HiC map.
-          system(paste("sed -i '/# DI_Down share axis/{n;s/.*/height = 10/}' ", pyGenome.ini, sep = ""))
-        }
-        # Run hicPlotTADs only if atleast 1 DI interaction detected
-        if (nrow(arc[abs(arc$logFC) > 2,]) != 0) {
-          system(paste(hicPlotTADs, " --tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", di_path, region, "_HB2_WT_vs_", comp, "-", tads, ".png", sep = ""))
-        }
+      # Run hicPlotTADs only if atleast 1 DI interaction detected
+      if (nrow(arc[abs(arc$logFC) > 2,]) != 0) {
+        system(paste(hicPlotTADs, " --tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", di_path, region, "_HB2_WT_vs_", comp, "-", tads, ".png", sep = ""))
       }
     }
   }
+}
 
 
 
