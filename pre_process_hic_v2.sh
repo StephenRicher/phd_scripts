@@ -9,7 +9,7 @@ export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
 ## Set project directory ##
 capture_regions="/home/stephen/phd/scripts/capture_regions.bed"
-project=/home/stephen/x_db/DBuck/s_richer/hic_01/
+project=/home/stephen/x_db/DBuck/s_richer/hic_01
 qc="${project}"/qc
 mkdir -p "${qc}"
 
@@ -212,7 +212,7 @@ for sample in "${samples[@]}"; do
       "${region_length}" "${hic_pairs_per_kb}" \
       >> "${summary_file}"
 
-  done <${capture_regions}; wait
+  done <${capture_regions}
 
   cat "${diffhic_dir}"/"${sample}".custom_header.sam \
       "${diffhic_dir}"/"${sample}".captured.sam \
@@ -267,5 +267,4 @@ for sample in "${samples[@]}"; do
   done <"${capture_regions}"
   rm "${sample}".fend "${sample}".hifive.mat "${sample}".hifive.project
 done
-
 
