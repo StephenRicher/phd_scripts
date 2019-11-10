@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Set master project directory
-project_dir="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis2"
+project_dir="/home/stephen/x_db/DBuck/s_richer/hic_01"
 # Set allele directory
 allele_dir="${project_dir}"/allele_specific
 # Set qc directory 
@@ -196,7 +196,7 @@ while IFS=$'\t' read -r chr start end region; do
       -s "${start}" \
       -e "${end}" \
       -b "${binsize}" \
-      -a \
+      -a -t 4 \
       -d "${hcx_dir}"/all_regions/"${region}" "${allele_samples[@]}"
   done
 done <"${capture_regions}"
