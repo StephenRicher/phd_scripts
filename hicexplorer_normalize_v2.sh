@@ -3,7 +3,7 @@
 # Activate extended globbing
 shopt -s extglob
 
-while getopts 'r:c:s:e:b:d:a:t:' flag; do
+while getopts 'r:c:s:e:b:d:at:' flag; do
   case "${flag}" in
     r) region="${OPTARG}" ;;
     c) chr="${OPTARG%/}" ;;
@@ -35,7 +35,7 @@ else
 fi
 
 # Define plot region - set maximum plot region size
-max_size=1500000
+max_size=2000000
 if (( $((end - start)) > "${max_size}" )); then
   mid=$(((end + start)/2))
   start_plot=$((mid-(max_size/2)))
@@ -46,6 +46,8 @@ else
   plot_range="${chr}":"${start}"-"${end}"
   depth=$(((end - start)/2))
 fi
+
+
 
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
 delete=()
