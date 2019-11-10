@@ -5,10 +5,14 @@ library(rhdf5)
 library(stringr)
 library(statmod)
 
-# Define directory and move to path
+# Define directory and sub folders and move to path
 path="/home/stephen/x_db/DBuck/s_richer/hic_01/allele_specific/diffhic/"
-di_path=paste(path,"differential_interactions/", sep = "")
+di_path = paste(path,"differential_interactions/", sep = "")
+tracks_path = paste(path,"tracks/", sep = "")
+figs_path = paste(path,"figures/", sep = "")
 dir.create(di_path)
+dir.create(tracks_path)
+dir.create(figs_path)
 setwd(path)
 
 # Whole genome sequence - FASTA headers have been modified to ensure they only contain chromosomes.
@@ -21,7 +25,8 @@ capture_regions = read.csv("/home/stephen/phd/scripts/capture_regions.bed", sep 
 
 hicPlotTADs = "/home/stephen/anaconda3/envs/hic_analysis/bin/hicPlotTADs"
 track_template_path = "/home/stephen/phd/scripts/pyGenomeTracks_configs/"
-HB2_WT-G1_vsG2_template_tads.ini == ""
+HB2_WT_G1_vs_G2_template.ini = paste(track_template_path, "diffhic_G1vsG2.ini", sep = "")
+HB2_WT_G1_vs_G2_template_tads.ini = paste(track_template_path, "diffhic_G1vsG2_tads.ini", sep = "")
 
 # Samples to process.
 samples = c("HB2_WT_G1-1",  "HB2_WT_G2-1", "HB2_WT_G1-2", "HB2_WT_G2-2") 
@@ -39,6 +44,10 @@ for (sample in samples) {
     print(paste(sample,sample_diagnostics))
   }
 }
+
+# Thresholds for filtering diffential interactions
+logfc_threshold = 1
+fdr_threshold = 0.05
 
 bin.size = 10000
 input = paste(samples, ".trim.h5", sep = "")
@@ -113,7 +122,7 @@ plotQLDisp(fit)
 result <- glmQLFTest(fit)
 rowData(data) <- cbind(rowData(data), result$table)
   
-clustered.sig <- diClusters(data, result$table, target=0.01, cluster.args=list(tol=1))
+clustered.sig <- diClusters(data, result$table, target = fdr_threshold, cluster.args=list(tol=1))
 useful.cols <- as.vector(outer(c("seqnames", "start", "end"), 1:2, paste0))
 tabcom <- combineTests(clustered.sig$indices[[1]], result$table)
 tabbest <- getBestTest(clustered.sig$indices[[1]], result$table)
@@ -121,13 +130,13 @@ tabstats <- data.frame(tabcom[,1:4], logFC=tabbest$logFC, FDR=clustered.sig$FDR)
 results.d <- as.data.frame(clustered.sig$interactions)[,useful.cols]
 results.d <- cbind(results.d, tabstats)
 o.d <- order(results.d$PValue)
-write.table(results.d[o.d,], file = paste(di_path, "HB2_WT_G1-vs-HB2_WT_G2.tsv", sep = ""), sep="\t",quote=FALSE, row.names=FALSE)
+write.table(results.d[o.d,], file = paste(di_path, "HB2_WT_G1-vs-G2.tsv", sep = ""), sep="\t",quote=FALSE, row.names=FALSE)
   
-for (tads in c('tads', 'logFC')) {
+for (tads in c('logFC', 'tads')) {
   if (tads == 'tads') {
-    pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template_tads.ini 
+    pyGenome_template.ini = HB2_WT_G1_vs_G2_template_tads.ini
   } else {
-    pyGenome_template.ini = HB2_WT_vs_HB2_CL4_template.ini
+    pyGenome_template.ini = HB2_WT_G1_vs_G2_template.ini
   }
     
   for (region in capture_regions$region) {
@@ -143,19 +152,22 @@ for (tads in c('tads', 'logFC')) {
       region_results.d[,c("seqnames1", "seqnames2")] = chromosome
       arc=region_results.d[,c("seqnames2","start2", "end2", "seqnames1","start1", "end1", "logFC")]
         
-      pyGenome.ini = paste(di_path, "HB2_WT_vs_", comp, "-", region, "-", bin.size, "-", tads,".ini", sep = "")
+      pyGenome.ini = paste(tracks_path, "HB2_WT_G1-vs-G2", "-", region, "-", bin.size, "-", tads,".ini", sep = "")
         
-      system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
+      system(paste("sed 's/capture_region/", region, "/g; ",
+                        "s/binsize/", bin.size, "/g; ", 
+                        "s/logfc_threshold/", logfc_threshold, "/g; ",
+                        "s/fdr_threshold/", fdr_threshold, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
         
       # Remove section for config file if no significant UP/DOWN interactions detected.
-      if (nrow(arc[arc$logFC < -2,]) != 0) {
-        write.table(arc[arc$logFC < -2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
+      if (nrow(arc[arc$logFC < -logfc_threshold,]) != 0) {
+        write.table(arc[arc$logFC < -logfc_threshold,], file = paste(di_path, region, "_HB2_WT_G1-vs-G2_di_down.arc", sep = ""), sep = "\t",quote = FALSE, 
                     row.names = FALSE, col.names = FALSE)
       } else {
         system(paste("sed -i '/Start DI_Down/,/End DI_Down/d' ", pyGenome.ini, sep = ""))
       }
-      if (nrow(arc[arc$logFC > 2,]) != 0) {
-        write.table(arc[arc$logFC > 2,], file = paste(di_path, region, "_HB2_WT-vs-", comp, "_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
+      if (nrow(arc[arc$logFC > logfc_threshold,]) != 0) {
+        write.table(arc[arc$logFC > logfc_threshold,], file = paste(di_path, region, "_HB2_WT_G1-vs-G2_di_up.arc", sep = ""), sep = "\t",quote = FALSE, 
                     row.names = FALSE, col.names = FALSE)
       } else {
         system(paste("sed -i '/Start DI_Up/,/End DI_Up/d' ", pyGenome.ini, sep = ""))
@@ -163,15 +175,12 @@ for (tads in c('tads', 'logFC')) {
         system(paste("sed -i '/# DI_Down share axis/{n;s/.*/height = 10/}' ", pyGenome.ini, sep = ""))
         }
       # Run hicPlotTADs only if atleast 1 DI interaction detected
-      if (nrow(arc[abs(arc$logFC) > 2,]) != 0) {
-        system(paste(hicPlotTADs, " --tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", di_path, region, "_HB2_WT_vs_", comp, "-", tads, ".png", sep = ""))
+      if (nrow(arc[abs(arc$logFC) > logfc_threshold,]) != 0) {
+        system(paste(hicPlotTADs, " --tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", figs_path, region, "HB2_WT_G1-vs-G2", "-", tads, ".png", sep = ""))
       }
     }
   }
 }
-
-
-
 
 
 
