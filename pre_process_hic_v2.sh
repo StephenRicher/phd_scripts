@@ -7,6 +7,9 @@ conda activate hic_analysis
 shopt -s extglob
 export TMPDIR=/home/stephen/x_db/DBuck/s_richer/tmp/
 
+# Define function to join sequence by char
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
 ## Set project directory ##
 capture_regions="/home/stephen/phd/scripts/capture_regions.bed"
 project=/home/stephen/x_db/DBuck/s_richer/hic_01
@@ -199,6 +202,33 @@ for sample in "${samples[@]}"; do
       | samtools view -Sb > ${sub_dir}/${sample}-${region}.tmp.bam
     mv ${sub_dir}/${sample}-${region}.tmp.bam ${sub_dir}/${sample}-${region}.bam
 
+    # Convert BAM to TSV format for conversion to .hic format
+    samtools view ${sub_dir}/${sample}-${region}.bam \
+    | awk '
+        /^@/ {next} 
+        {if(and($2,0x10)) s=0; else s=1} 
+        NR%2 {m=$5; printf "%s\t%s\t%s\t%s\t0\t", $1, s, $3, $4} 
+        NR%2==0 {printf "%s\t%s\t%s\t1\t%s\t%s\n", s, $3, $4, m, $5}' \
+    > ${sub_dir}/${sample}-${region}.pre.tsv
+
+    # Convert TSV to .hic format
+    juicer_tools pre \
+      -r $(join_by , $(seq 1000 1000 20000)) \
+      ${sub_dir}/${sample}-${region}.pre.tsv \
+      ${sub_dir}/${sample}-${region}.hic \
+      hg38
+
+    # Generate .hic file of summed replicate
+    if [[ ${sample} == *'-2' ]]; then 
+       juicer_tools pre \
+         -r $(join_by , $(seq 1000 1000 20000)) \
+         <(cat  ${sub_dir}/${sample/-*/}*-${region}.pre.tsv) \
+         ${sub_dir}/${sample/-*/}-${region}-sum.hic \
+         hg38
+    fi
+
+    cp *.hic /media/stephen/Data/hic_01/data/hic_formatted/
+
     # Generate modified region BAM file
     samtools view ${sub_dir}/${sample}-${region}.bam \
       | awk -v OFS='\t' -v chr="${chr}" -v len="${region_length}" -v start="${start}" -v region="${region}" '
@@ -242,8 +272,6 @@ eval "$(conda shell.bash hook)"
 conda activate py27env
 
 # Run QUASAR-QC on all regions at multiple bin ranges
-# Define function to join sequence by char
-function join_by { local IFS="$1"; shift; echo "$*"; }
 
 for sample in "${samples[@]}"; do
   matrix="${diffhic_dir}"/"${sample}".captured.bam
