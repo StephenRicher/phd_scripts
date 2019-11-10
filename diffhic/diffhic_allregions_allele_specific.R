@@ -5,7 +5,7 @@ library(rhdf5)
 library(stringr)
 
 # Define directory and move to path
-path="/home/stephen/x_db/DBuck/s_richer/stephen_test/projects/hic_analysis/allele_specific/diffhic/"
+path="/home/stephen/x_db/DBuck/s_richer/hic_01/allele_specific/diffhic/"
 di_path=paste(path,"differential_interactions/", sep = "")
 setwd(path)
 
@@ -39,7 +39,7 @@ for (sample in samples) {
   }
 }
 
-bin.size = 25000
+bin.size = 10000
 input = paste(samples, ".trim.h5", sep = "")
 data <- squareCounts(input, hs.param, width = bin.size)
 colnames(data) = samples
@@ -95,12 +95,9 @@ data <- normOffsets(data, se.out=TRUE)
 #lines(ab[o], fit$fitted[o], col="red")     
 
 ## Modelling Biological Variablity ##
-cell_lines = str_remove(samples, "_G[12]-[12]")
-sample <- gl(2, 2, length = length(cell_lines))
-cell <- factor(cell_lines, levels = c("HB2_WT", "HB2_CL4", "MCF7"))
-genome <- factor(rep(c("G1","G2"), length(cell_lines)/2), levels = c("G1", "G2"))
-data.frame(cell,sample,genome)
-design <- model.matrix(~cell+cell:sample+cell:genome)
+sample <- factor(c("1", "1", "2", "2"))
+genome <- factor(c("G1", "G2", "G1", "G2"), levels = c("G1", "G2"))
+design <- model.matrix(~sample+genome)
 
 # Convert to DGEList for edgeR
 y <- asDGEList(data)
