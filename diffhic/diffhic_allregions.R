@@ -6,8 +6,12 @@ library(stringr)
 library(statmod)
 # Define directory and move to path
 path="/home/stephen/x_db/DBuck/s_richer/hic_01/data/diffhic/"
-di_path=paste(path,"differential_interactions/", sep = "")
+di_path = paste(path,"differential_interactions/", sep = "")
+tracks_path = paste(path,"tracks/", sep = "")
+figs_path = paste(path,"figures/", sep = "")
 dir.create(di_path)
+dir.create(tracks_path)
+dir.create(figs_path)
 setwd(path)
 
 # Whole genome sequence - FASTA headers have been modified to ensure they only contain chromosomes.
@@ -43,8 +47,9 @@ for (sample in samples) {
   }
 }
 
-# Threshold for filtering logFC diffential interactions
-logfc_threshold = 2
+# Thresholds for filtering diffential interactions
+logfc_threshold = 1.5
+fdr_threshold = 0.01
 
 bin.size = 5000
 input = paste(samples, ".trim.h5", sep = "")
@@ -125,7 +130,7 @@ for (coef in c(2, 3)) {
   result <- glmQLFTest(fit, coef = coef)
   rowData(data) <- cbind(rowData(data), result$table)
   
-  clustered.sig <- diClusters(data, result$table, target=0.01, cluster.args=list(tol=1))
+  clustered.sig <- diClusters(data, result$table, target = fdr_threshold, cluster.args=list(tol=1))
   useful.cols <- as.vector(outer(c("seqnames", "start", "end"), 1:2, paste0))
   tabcom <- combineTests(clustered.sig$indices[[1]], result$table)
   tabbest <- getBestTest(clustered.sig$indices[[1]], result$table)
@@ -164,9 +169,12 @@ for (coef in c(2, 3)) {
         region_results.d[,c("seqnames1", "seqnames2")] = chromosome
         arc=region_results.d[,c("seqnames2","start2", "end2", "seqnames1","start1", "end1", "logFC")]
       
-        pyGenome.ini = paste(di_path, "HB2_WT_vs_", comp, "-", region, "-", bin.size, "-", tads,".ini", sep = "")
+        pyGenome.ini = paste(tracks_path, "HB2_WT_vs_", comp, "-", region, "-", bin.size, "-", tads,".ini", sep = "")
         
-        system(paste("sed 's/capture_region/", region, "/g; s/binsize/", bin.size, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
+        system(paste("sed 's/capture_region/", region, "/g; ",
+                     "s/binsize/", bin.size, "/g; ", 
+                     "s/logfc_threshold/", logfc_threshold, "/g; ",
+                     "s/fdr_threshold/", fdr_threshold, "/g' ", pyGenome_template.ini, " > ", pyGenome.ini, sep = ""))
       
         # Remove section for config file if no significant UP/DOWN interactions detected.
         if (nrow(arc[arc$logFC < -logfc_threshold,]) != 0) {
@@ -185,7 +193,7 @@ for (coef in c(2, 3)) {
         }
         # Run hicPlotTADs only if atleast 1 DI interaction detected
         if (nrow(arc[abs(arc$logFC) > logfc_threshold,]) != 0) {
-          system(paste(hicPlotTADs, " --dpi 600 ", "--tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", di_path, region, "_HB2_WT_vs_", comp, "-", tads, ".png", sep = ""))
+          system(paste(hicPlotTADs, " --dpi 600 ", "--tracks ", pyGenome.ini, " --region ", chromosome, ":", start, "-", end, " -o ", figs_path, region, "_HB2_WT_vs_", comp, "-", tads, ".png", sep = ""))
         }
       }
     }
