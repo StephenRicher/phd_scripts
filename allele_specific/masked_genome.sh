@@ -22,7 +22,7 @@ while getopts 's:g:v:o:t:' flag; do
   esac
 done
 
-# If genome is not indexed then raise error.
+# If genome is not indexed then index.
 if [ ! -f "${genome}".fai ] ; then
   samtools faidx "${genome}"
 fi
