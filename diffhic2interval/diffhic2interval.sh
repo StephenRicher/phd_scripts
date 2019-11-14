@@ -11,7 +11,7 @@ for comp in MCF7 HB2_CL4; do
     out_up="${dir}"/all_HB2_WT-vs-"${comp}"_di_up_interval.txt
     out_down="${dir}"/all_HB2_WT-vs-"${comp}"_di_down_interval.txt
 
-    # Create header for output files and customise
+    # Create header for output files and customise.
     for outfile in "${out_up}" "${out_down}"; do
         cp interval_header.txt "${outfile}"
         if [[ "${outfile}" == *"di_up"* ]]; then
@@ -19,13 +19,14 @@ for comp in MCF7 HB2_CL4; do
         else
             change="DOWN"
         fi
-        # Modify header for each comparison and down/up
+        # Modify header for each comparison and UP/DOWN logFC.
         sed -i -e "s/CHANGE/"${change}"/g" -e "s/COMP/"${comp}"/g" "${outfile}"
     done
 
     # Compute max logFC and scale scores by region.
     while IFS=$'\t' read -r chr start end region; do
 
+        # Get maximum absolute logFC from UP/DOWN interactions.
         max=$(cat "${dir}"/"${region}"*"${comp}"*.arc \
               | cut -f 7 | tr -d '-' | sort | tail -n 1)
 
