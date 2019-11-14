@@ -1,0 +1,2 @@
+track type=interact name="HB2_WT-vs-COMP DI CHANGE" description="Differential chromatin interactions: HB2_WT vs COMP DI CHANGE" interactUp=true useScore=on maxHeightPixels=200:100:50 visibility=full
+#chrom	chromStart	chromEnd	name	score	value	exp	color	sourceChrom	sourceStart	sourceEnd	sourceName	sourceStrand	targetChrom	targetStart	targetEnd	targetName	targetStrand
