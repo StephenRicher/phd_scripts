@@ -36,7 +36,7 @@ genome_digest="${genome_dir}"/"${build}"_Mbo1-digest.txt.gz
 pyHiCTools digest --log "${qc}"/"${build}"_Mbo1-digest.logfile \
   --restriction ^GATC -zu "${genome}" > "${genome_digest}"
 
-## Generate bowtie2 index and inspect ## 
+## Generate bowtie2 index and inspect ##
 genome_index_dir="${genome_dir}"/bt2_index
 mkdir -p "${genome_index_dir}"
 genome_index="${genome_index_dir}"/"${build}"
@@ -149,8 +149,8 @@ rm "${custom_genome}"
 # Create custom genome and rename FASTA header to region name.
 while IFS=$'\t' read -r chr start end region; do
   samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
-    | sed "1 s/^.*$/>${region}/" \
-    >> "${custom_genome}"
+  | sed "1 s/^.*$/>${region}/" \
+  >> "${custom_genome}"
 done <"${capture_regions}"
 
 for sample in "${samples[@]}"; do
@@ -161,14 +161,14 @@ for sample in "${samples[@]}"; do
     --log "${qc}"/"${sample}".filter.logfile \
     --sample "${sample}" \
     "${data_dir}"/"${sample}".proc.bam \
-    > "${data_dir}"/"${sample}".filt.bam \
-    2>> "${qc}"/filter_statistics.tsv
+  > "${data_dir}"/"${sample}".filt.bam \
+  2>> "${qc}"/filter_statistics.tsv
 
   samtools view -f 0x40 -b "${data_dir}"/"${sample}".filt.bam \
-    > "${data_dir}"/"${sample}".R1.filt.bam
+  > "${data_dir}"/"${sample}".R1.filt.bam
 
   samtools view -f 0x80 -b "${data_dir}"/"${sample}".filt.bam \
-    > "${data_dir}"/"${sample}".R2.filt.bam
+  > "${data_dir}"/"${sample}".R2.filt.bam
 
   # Extract SAM header and remove chromosome lines
   samtools view -H "${data_dir}"/"${sample}".filt.bam \
@@ -197,17 +197,18 @@ for sample in "${samples[@]}"; do
 
     # Correct SAM header to remove unused chromosomes.
     cat <(samtools view -H ${sub_dir}/${sample}-${region}.bam \
-            | awk -v chr="@SQ\tSN:${chr}\t" '$0 ~ chr || /@HD/ || /@PG/') \
-         <(samtools view -S ${sub_dir}/${sample}-${region}.bam) \
-      | samtools view -Sb > ${sub_dir}/${sample}-${region}.tmp.bam
-    mv ${sub_dir}/${sample}-${region}.tmp.bam ${sub_dir}/${sample}-${region}.bam
+          | awk -v chr="@SQ\tSN:${chr}\t" '$0 ~ chr || /@HD/ || /@PG/') \
+        <(samtools view -S ${sub_dir}/${sample}-${region}.bam) \
+    | samtools view -Sb > ${sub_dir}/${sample}-${region}.tmp.bam
+    mv ${sub_dir}/${sample}-${region}.tmp.bam \
+       ${sub_dir}/${sample}-${region}.bam
 
     # Convert BAM to TSV format for conversion to .hic format
     samtools view ${sub_dir}/${sample}-${region}.bam \
     | awk '
-        /^@/ {next} 
-        {if(and($2,0x10)) s=0; else s=1} 
-        NR%2 {m=$5; printf "%s\t%s\t%s\t%s\t0\t", $1, s, $3, $4} 
+        /^@/ {next}
+        {if(and($2,0x10)) s=0; else s=1}
+        NR%2 {m=$5; printf "%s\t%s\t%s\t%s\t0\t", $1, s, $3, $4}
         NR%2==0 {printf "%s\t%s\t%s\t1\t%s\t%s\n", s, $3, $4, m, $5}' \
     > ${sub_dir}/${sample}-${region}.pre.tsv
 
@@ -219,7 +220,7 @@ for sample in "${samples[@]}"; do
       hg38
 
     # Generate .hic file of summed replicate
-    if [[ ${sample} == *'-2' ]]; then 
+    if [[ ${sample} == *'-2' ]]; then
        juicer_tools pre \
          -r $(join_by , $(seq 1000 1000 20000)) \
          <(cat  ${sub_dir}/${sample/-*/}*-${region}.pre.tsv) \
