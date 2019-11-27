@@ -13,7 +13,6 @@ if [ -z "${@}" ]; then
 fi
 
 
-
 ctcf_seq=$'>ctcf\nCCACNAGGTGGCAG'
 ctcf_seq_revcomp=$'>ctcf\nCTGCCACCTNGTGG'
 
@@ -29,6 +28,8 @@ for file in "${@}"; do
         declare -a alignments
         declare -a scores
 
+
+
         # Run alignment for forward and reverse sequence and save output.
         for sequence in "${ctcf_seq}" "${ctcf_seq_revcomp}"; do
             align=$(needle \
@@ -39,6 +40,11 @@ for file in "${@}"; do
             alignments+=("${align}")
             scores+=($(echo "${align}" | grep Score |  tr ' ' '\n' | tail -n 1))
         done
+
+        # Skip if empty. Usually due to invalid chr name when running faidx.
+        if [ -z "${alignments}" ]; then
+            continue
+        fi
 
         # Calculate alignment score difference between forward and reverse.
         score_diff=$(echo "${scores[0]} - ${scores[1]}"  | bc | tr -d '-')
@@ -81,13 +87,13 @@ for file in "${@}"; do
         unset scores
         unset alignments
 
+        # Sort by column 1, then numeric sort by column 2
         echo "${line}" \
-        |  awk -v OFS='\t' -v direction="${direction}" \
-               -v start="${abs_ctcf_start}" -v end="${abs_ctcf_end}" '
-               {print $2, start, end, ".", $6, direction}' \
-        | bedtools sort
+        | awk -v OFS='\t' -v direction="${direction}" \
+              -v start="${abs_ctcf_start}" -v end="${abs_ctcf_end}" '
+               {print $2, start, end, ".", $6, direction}'
 
-    done < "${file}"
+    done < "${file}" | sort -k 1,1 -k 2,2n
 done
 
 
