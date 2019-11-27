@@ -19,6 +19,11 @@ while getopts 'r:c:s:e:b:d:at:' flag; do
 done
 shift "$((OPTIND-1))"
 
+# Skip if bin size is larger than the region
+if (( binsize > end - start )); then
+  exit 1
+fi
+
 export NUMEXPR_MAX_THREADS="${threads}"
 
 samples=("${@}")
@@ -46,8 +51,6 @@ else
   plot_range="${chr}":"${start}"-"${end}"
   depth=$(((end - start)/2))
 fi
-
-
 
 # Check hic interaction density for each replicate of each sample. If any are 0 then remove from sample list
 delete=()
@@ -92,15 +95,6 @@ hicNormalize --matrices "${matrices[@]}" \
 
 mkdir -p "${dir}"/correlation_plots "${dir}"/diagnostic_plots "${dir}"/counts_vs_dist
 
-# Skip if bin size is larger than the region
-if (( binsize > end - start )); then
-  exit 1
-fi
-
-# Create new array so original is not overwritten
-#groups2=( "${groups[@]}" )
-#delete2=( "${delete[@]}" )
-
 mkdir -p "${dir}"/"${binsize}"
 
 # Merge raw and normalised matrices into a variety of bin sizes
@@ -117,7 +111,7 @@ done
 mkdir -p "${dir}"/"${binsize}"/tads
 for group in "${groups[@]}"; do
 
-  # Reformat to (n+3)*n matrix for hicep
+  # Reformat to (n+3)*n matrix for hicrep
   for matrix in "${dir}"/"${binsize}"/"${group}"*"${binsize}".h5; do
     hicConvertFormat --matrices "${matrix}" \
                      --inputFormat h5 --outputFormat homer \
@@ -316,36 +310,6 @@ montage "${dir}"/"${binsize}"/hic_plots_obs_exp/*-norm_sum_iced_obs_exp.png \
         -geometry +0+0 -tile x1 \
         "${dir}"/"${binsize}"/hic_plots_obs_exp/${region}-${binsize}-sum_hic_plots_obs_exp.png
 
-#for group in "${groups[@]}"; do
-#  for type in "norm.h5" "norm_sum.h5"; do
-#    echo res:"${binsize}" > "${dir}"/"${binsize}"/tads/"${group}"_hitad_metafile-"${type/.h5/}".txt
-#    r=1
-#    for replicate in "${dir}"/"${binsize}"/"${group}"*"${type}"; do
-#      replicate_rmpath="${replicate##*/}"
-#      out="${dir}"/"${binsize}"/"${replicate_rmpath%.h5}".cool
-#      hicConvertFormat --matrices "${replicate}" \
-#                       --outFileName "${out}" \
-#                       --inputFormat h5 --outputFormat cool
-#      nbins=$(($(tail -n 1 <(cooler dump "${out}") | cut -f 2) + 1))
-#      chromsize=$((nbins*binsize))
-#      # Load cooler and convert to normalised to integer
-#      cooler load -f coo <(echo -e "${chr}\t${chromsize}"):"${binsize}" <(cooler dump "${out}" | awk -v OFS='\t' '$3=int($3)') "${out}".tmp.cool
-#      mv "${out}".tmp.cool "${out}"
-#      cooler balance --max-iters 1000 "${out}"
-#      echo rep"${r}":"${out}" >> "${dir}"/"${binsize}"/tads/"${group}"_hitad_metafile-"${type/.h5/}".txt
-#      ((r++))
-#    done
-#    hitad --output "${dir}"/"${binsize}"/tads/"${group}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".txt \
-#          --datasets "${dir}"/"${binsize}"/tads/"${group}"_hitad_metafile-"${type/.h5/}".txt \
-#          --logFile "${dir}"/"${binsize}"/tads/"${group}"_hitad_log-"${type/.h5/}".txt \
-#          --maxsize 1000000
-#    awk -v start="${start}" -v OFS='\t' '
-#      {$2=$2+start; $3=$3+start; print $1, $2, $3, $1, $2, $3, 0}' \
-#      "${dir}"/"${binsize}"/tads/"${group}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".txt \
-#      > "${dir}"/"${binsize}"/tads/"${group}"-"${region}"-"${binsize}"-hitad-"${type/.h5/}".links
-#  done
-#done
-
 mkdir -p "${dir}"/"${binsize}"/tad_plots/tracks
 
 for transform in count obs_exp; do
@@ -380,7 +344,7 @@ for transform in count obs_exp; do
     if [[ "${transform}" == "obs_exp" ]]; then
       sed -i "s/\.h5/_${transform}\.h5/g" "${plot_track}"
       sed -i 's/min_value = 1/min_value = 0/g' "${plot_track}"
-      sed -i 's/#colormap/colormap/g' "${plot_track}"
+      #sed -i 's/#colormap/colormap/g' "${plot_track}"
       sed -i '/transform = log1p/d' "${plot_track}"
       sed -i "s/#max_value = none/max_value = 2/g" "${plot_track}"
     fi
@@ -396,7 +360,7 @@ for transform in count obs_exp; do
     hicPlotTADs --tracks "${plot_track}" --region ${plot_range} \
                 --outFileName "${plotname}" \
                 --title "${region}"' at '"$((binsize/1000))"'kb bin size' \
-                --dpi 600
+                --dpi 300
 
     rm "${dir}"/"${binsize}"/tad_plots/${track##*/}_plot_log_temp.txt
   done
