@@ -122,9 +122,9 @@ for sample in "${samples[@]}"; do
 
     pyHiCTools extract \
         --sample "${sample}" --gzip \
-        --log "${qc}"/"${sample}".extract.logfile \
+        --log "${qc_dir}"/"${sample}".extract.logfile \
         <(samtools view -hs 42.05 "${data_dir}"/"${sample}".proc.bam) \
-    >> "${qc}"/hic_filter_qc.txt.gz
+    >> "${qc_dir}"/hic_filter_qc.txt.gz
 
 done
 
