@@ -45,15 +45,26 @@ main() {
     hic_processed="${data_dir}"/"${sample}".proc.bam
     hic_filtered="${data_dir}"/"${sample}".filt.bam
     hic_extract="${data_dir}"/"${sample}".extracted-subsample.txt
-    forward_trunc=$(modify_path -d "${data_dir}" -a '-trunc' "${forward}")
-    reverse_trunc=$(modify_path -d "${data_dir}" -a '-trunc' "${reverse}")
     truncation_summary="${qc_dir}"/"${sample}"-truncation_summary.txt
 
     # Check if any output files already exist.
     any_files "${intermediate}" "${hic_stats}" "${hic_processed}" \
-              "${hic_filtered}" "${truncation_summary}" "${forward_trunc}" \
-              "${reverse_trunc}" "${hic_extract}" \
+              "${hic_filtered}" "${truncation_summary}" "${hic_extract}" \
         && exit 1
+
+    # Run truncation in parallel
+    local i
+    for fastq in "${forward}" "${reverse}"; do
+        ((i=i%threads)); ((i++==0)) && wait
+        (
+        truncated_fastq=$(modify_path -d "${data_dir}" -a '-trunc' "${fastq}")
+        any_files "${truncated_fastq}" && exit 1
+        truncate "${fastq}" "${truncated_fastq}" \
+            "${restriction_seq}" \
+            "${truncation_summary}"
+        ) &
+    done
+    wait
 
     export -f truncate
     parallel -j "${threads}" --colsep '\t' --xapply \
