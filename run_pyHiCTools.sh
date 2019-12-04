@@ -33,7 +33,6 @@ main() {
         exit 1
     fi
 
-
     if ! all_files "${forward}" "${reverse}" "${digest}"; then
         usage
         exit 1
