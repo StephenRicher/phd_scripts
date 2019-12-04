@@ -4,15 +4,14 @@
 #########################################################################
 #### USER CONFIGURATION ####
 
-readonly project_name=project1
+readonly project_name=hic-01
 # Directory to store project folder.
-readonly top_dir=/home/stephen/phd/BathMastersPython/bash/
+readonly top_dir=/home/stephen/x_db/DBuck/s_richer/
 # Genome
 readonly build=GRCh38
-readonly genome=/media/stephen/Data/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 # Genome index
-#readonly grch38_idx=~/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
-readonly grch38_idx=/media/stephen/Data/genomes/index/GRCh38
+readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
 # Define restriction enzyme cut sequence
 readonly re_name=Mbo1
 readonly re_seq='^GATC'
@@ -62,8 +61,8 @@ main() {
 
     fastqc --threads "${threads}" --outdir "${qc_dir}" $(< "${raw_fastqs}")
 
-    #fastq_screen --aligner bowtie2 --threads "${threads}" \
-    #    --outdir "${qc_dir}" $(< "${raw_fastqs}")
+    fastq_screen --aligner bowtie2 --threads "${threads}" \
+        --outdir "${qc_dir}" $(< "${raw_fastqs}")
 
     # Execute cutadapt
     local forward_adapter=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
@@ -110,7 +109,7 @@ main() {
         > "${qc_dir}"/all_samples_summary.txt
 
     # Extract all samples names from processed bams file
-    samples=$(read_samples_from_file "${processed_bams}")
+    samples=( $(read_samples_from_file "${processed_bams}") )
 
     while IFS=$'\t' read -r chr start end region; do
         for binsize in $(seq 1000 1000 10000); do
@@ -126,20 +125,6 @@ main() {
         done
     done < "${capture_regions}"
 
-#    # Loop through data in pairs (for paired-end sequencing)
-#    #while read -r read1; read -r read2; do
-#
-#        local sample=$(get_sample "${read1}") || exit 1
-#
- #       bowtie2 -x "${grch38_idx}" \
-  #              -1 <(zcat "${read1}") \
-   #             -2 <(zcat "${read2}") \
-    #            --very-fast -p "${threads}" \
-     #       2> "${qc_dir}"/"${sample}".bt2_stats.txt \
-      #      | samtools sort -O bam -@ "${threads}" \
-       #     > "${data_dir}"/"${sample}".sorted.bam
-#
-#  #  done < "${trimmed_fastqs}"
 }
 
 read_samples_from_file() {
