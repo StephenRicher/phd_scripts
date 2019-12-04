@@ -26,6 +26,7 @@ readonly genome_path="${genome_dir}"/"${genome_url##*/}"
 
 # Other
 threads=6
+
 main() {
 
     # Check top level directory exists.
