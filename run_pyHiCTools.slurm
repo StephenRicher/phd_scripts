@@ -3,12 +3,12 @@
 #SBATCH --account=ba-fs6sdb
 #SBATCH --array=1-6
 #SBATCH --job-name=run_pyHiCTools_%A_%a
-#SBATCH --output=/home/u/sr467/scratch/projects/hic-01/job_logs/run_pyHiCTools_%A_%a.out
-#SBATCH --error=/home/u/sr467/scratch/projects/hic-01/job_logs/run_pyHiCTools_%A_%a.err
+#SBATCH --output=/home/u/sr467/scratch/projects/hic-01/qc/run_pyHiCTools_%A_%a.out
+#SBATCH --error=/home/u/sr467/scratch/projects/hic-01/qc/run_pyHiCTools_%A_%a.err
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 #SBATCH --workdir=/home/u/sr467/scratch/projects/hic-01/
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=sr467@bath.ac.uk
@@ -33,8 +33,10 @@ digest=/home/u/sr467/scratch/projects/genomes/GRCh38/GRCh38_Mbo1-digest.txt.gz
 re_seq='^GATC'
 
 # Other options
-data_dir="/home/u/sr467/scratch/projects/hic-01/data"
-qc_dir="/home/u/sr467/scratch/projects/hic-01/qc"
+data_dir="/home/u/sr467/scratch/projects/hic-01/data/"
+qc_dir="/home/u/sr467/scratch/projects/hic-01/qc/"
+paths_dir="/home/u/sr467/scratch/projects/hic-01/paths/"
+processed_bams="${paths_dir}"/hic-processed_bams.txt
 threads="${SLURM_CPUS_PER_TASK}"
 
 # Get nth and nth-1 line from trimmed_fastqs
@@ -43,13 +45,14 @@ input_reads=( $(head -n "${line_num}" "${trimmed_fastqs}" | tail -n 2) )
 
 # Run pyHiCTools
 mpirun run_pyHiCTools \
-    -f "${input_reads[0]}" \
-    -r "${input_reads[1]}" \
-    -x "${bt2_idx}" \
-    -i "${digest}" \
-    -s "${re_seq}" \
-    -d "${data_dir}" \
-    -q "${qc_dir}" \
-    -j "${threads}"
+        -f "${input_reads[0]}" \
+        -r "${input_reads[1]}" \
+        -x "${bt2_idx}" \
+        -i "${digest}" \
+        -s "${re_seq}" \
+        -d "${data_dir}" \
+        -q "${qc_dir}" \
+        -j "${threads}" \
+    >> "${processed_bams}"
 
 
