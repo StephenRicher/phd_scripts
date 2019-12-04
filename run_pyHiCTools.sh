@@ -66,10 +66,12 @@ main() {
             --sample "${sample}" \
             --log "${qc_dir}"/"${sample}".bowtie2.logfile \
             --intermediate "${intermediate}" \
+            -@ "${threads}" \
             "${forward_trunc}" "${reverse_trunc}" \
         2> "${qc_dir}"/"${sample}".alignment_stats.txt \
         | pyHiCTools deduplicate \
             --log "${qc_dir}"/"${sample}".dedup.logfile \
+            -@ "${threads}" \
         2> "${qc_dir}"/"${sample}".dedup_stats.txt \
         | pyHiCTools process \
             --digest "${digest}" \
