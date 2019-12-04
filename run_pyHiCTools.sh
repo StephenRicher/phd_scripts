@@ -59,17 +59,12 @@ main() {
         (
         truncated_fastq=$(modify_path -d "${data_dir}" -a '-trunc' "${fastq}")
         any_files "${truncated_fastq}" && exit 1
-        truncate "${fastq}" "${truncated_fastq}" \
-            "${restriction_seq}" \
-            "${truncation_summary}"
+        pyHiCTools truncate --restriction "${restriction_seq}" -zu "${fastq}" \
+            > "${truncated_fastq}" \
+            2>> "${truncation_summary}"
         ) &
     done
     wait
-
-    export -f truncate
-    parallel -j "${threads}" --colsep '\t' --xapply \
-        truncate {1} {2} "${restriction_seq}" "${truncation_summary}" \
-        ::: "${forward}" "${reverse}" ::: "${forward_trunc}" "${reverse_trunc}"
 
     pyHiCTools map \
             --index "${bt2_idx}"  \
@@ -124,17 +119,6 @@ main() {
     echo "${hic_filtered}"
 }
 
-truncate() {
-    local file="${1}"
-    local output="${2}"
-    local restriction="${3}"
-    local summary="${4}"
-
-    pyHiCTools truncate \
-        --restriction "${restriction}" -zu "${file}" \
-        >> "${output}" \
-        2> "${summary}"
-}
 
 fail() {
     >&2 echo "${1}"
