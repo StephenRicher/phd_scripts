@@ -6,19 +6,23 @@
 
 readonly project_name=hic_01-subsample
 # Directory to store project folder.
-readonly top_dir=/home/stephen/x_db/DBuck/s_richer/
+#readonly top_dir=/home/stephen/x_db/DBuck/s_richer/
+readonly top_dir=/media/stephen/Data/
 # Genome
 readonly build=GRCh38
-readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+#readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+readonly genome=/media/stephen/Data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
 # Genome index
-readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
+#readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
+readonly grch38_idx=/media/stephen/Data/genomes/index/GRCh38
 # Define restriction enzyme cut sequence
 readonly re_name=Mbo1
 readonly re_seq='^GATC'
 # Define capture regions
 readonly capture_regions=/home/stephen/phd/scripts/capture_regions.bed
 # Path to data paths
-readonly raw_fastqs=/home/stephen/x_db/DBuck/s_richer/hic_01-subsample/paths/raw_fastqs.txt
+#readonly raw_fastqs=/home/stephen/x_db/DBuck/s_richer/hic_01-subsample/paths/raw_fastqs.txt
+readonly raw_fastqs=/media/stephen/Data/hic_01-subsample/paths/raw_fastqs.txt
 # Define threads
 threads=6
 
@@ -39,21 +43,18 @@ readonly digest="${project_dir}"/"${build}"_"${re_name}"-digest.txt.gz
 main() {
 
     # Check top level directory exists.
-    is_dir "${top_dir}" \
-        || fail "Error: "${top_dir}" is not a directory."
+    all_dirs "${top_dir}" || fail
 
     # Check provided input files are not empty.
-    ! all_files "${genome}" "${raw_fastqs}" && exit 1
+    all_files "${genome}" "${data_urls}" || fail
 
     # Create the necessary sub-directories.
     mkdir -p "${project_dir}" "${data_dir}" \
              "${qc_dir}" "${paths_dir}" \
-        || exit 1
+        || fail
 
     # Create copy of data ULRS in project folder.
     cp "${raw_fastqs}" "${paths_dir}"
-
-    if [[ 1 == 2 ]]; then
 
     fastqc --threads "${threads}" --outdir "${qc_dir}" $(< "${raw_fastqs}")
 
@@ -85,7 +86,8 @@ main() {
             -s "${re_seq}" \
             -d "${data_dir}" \
             -q "${qc_dir}" \
-            -j "${threads}"
+            -j "${threads}" \
+            -f
     done < "${trimmed_fastqs}" > "${processed_bams}"
 
     /home/stephen/phd/scripts/figures/plot_filter.R \
@@ -103,8 +105,6 @@ main() {
     done < "${processed_bams}" \
         | sed '2,${/sample\tcapture_region/d;}' \
         > "${qc_dir}"/all_samples_summary.txt
-
-    fi
 
     # Extract all samples names from processed bams file
     samples=( $(read_samples_from_file "${processed_bams}") )
@@ -124,6 +124,7 @@ main() {
     done < "${capture_regions}"
 }
 
+
 read_samples_from_file() {
     local file="${1}"
     while read -r path; do
@@ -131,9 +132,12 @@ read_samples_from_file() {
     done < "${file}" | uniq
 }
 
+
 fail() {
-    >&2 echo "${1}"
+    all_empty "${@}" || >&2 echo "${1}"
+    usage
     exit "${2-1}"
 }
+
 
 main
