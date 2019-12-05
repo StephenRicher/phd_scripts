@@ -11,34 +11,32 @@ main() {
     local qc_dir="."
     local threads=1
 
-    while getopts 'f:r:x:i:s:d:q:j:' flag; do
+    while getopts '1:2:x:i:s:d:q:j:f' flag; do
         case "${flag}" in
-            f) forward="${OPTARG}" ;;
-            r) reverse="${OPTARG}" ;;
+            1) forward="${OPTARG}" ;;
+            2) reverse="${OPTARG}" ;;
             x) bt2_idx="${OPTARG}" ;;
             i) digest="${OPTARG}" ;;
             s) restriction_seq="${OPTARG}" ;;
             d) data_dir="${OPTARG%/}" ;;
             q) qc_dir="${OPTARG%/}" ;;
             j) threads="${OPTARG}" ;;
+            f) local keep_files="false" ;;
             *) usage ;;
         esac
     done
     shift "$((OPTIND-1))"
 
-    if any_empty -n 5 "${forward}" "${reverse}" "${bt2_idx}" \
-                      "${digest}" "${restriction_seq}"; then
-       >&2 echo "Error: Missing mandatory arguments."
-        usage
-        exit 1
-    fi
 
-    if ! all_files "${forward}" "${reverse}" "${digest}"; then
-        usage
-        exit 1
-    fi
+    any_empty -n 5 "${forward}" "${reverse}" "${bt2_idx}" \
+                   "${digest}" "${restriction_seq}" \
+        && fail "Error: Missing mandatory arguments."
 
-    local sample=$(get_sample "${forward}") || exit 1
+    all_files "${forward}" "${reverse}" "${digest}" || fail
+
+    all_dirs "${data_dir}" "${qc_dir}" || fail
+
+    local sample=$(get_sample "${forward}") || fail
 
     intermediate="${data_dir}"/"${sample}".fixmate.bam
     hic_stats="${qc_dir}"/"${sample}".hic_stats.txt
@@ -53,7 +51,7 @@ main() {
     any_files "${intermediate}" "${hic_stats}" "${hic_processed}" \
               "${hic_filtered}" "${truncation_summary}" "${hic_extract}" \
               "${forward_trunc}" "${reverse_trunc}" \
-        && exit 1
+        && retain "${keep_files}" && fail
 
     # Run truncation in parallel - USE GNU PARALLEL WHEN THIS IS INSTALLED ON CLUSTER
     pyHiCTools truncate --restriction "${restriction_seq}" -zu "${forward}" \
@@ -134,7 +132,8 @@ truncate() {
 
 
 fail() {
-    >&2 echo "${1}"
+    all_empty "${@}" || >&2 echo "${1}"
+    usage
     exit "${2-1}"
 }
 
