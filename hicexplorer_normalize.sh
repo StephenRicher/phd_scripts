@@ -101,9 +101,10 @@ for matrix in "${matrices_norm[@]}" "${matrices[@]}"; do
     matrix_rmpath="${matrix##*/}"
     matrix_rmpath="${matrix_rmpath/'-1000'/-${binsize}}"
     if [[ "${binsize}" != "1000" ]]; then
-        hicMergeMatrixBins --matrix "${matrix}" \
-                           --numBins $((${binsize}/1000)) \
-                           --outFileName "${dir}"/"${binsize}"/"${matrix_rmpath}"
+        hicMergeMatrixBins \
+            --matrix "${matrix}" \
+            --numBins $((${binsize}/1000)) \
+            --outFileName "${dir}"/"${binsize}"/"${matrix_rmpath}"
   fi
 done
 
@@ -180,10 +181,11 @@ if [ ${#groups[@]} -eq 0 ]; then
 fi
 
 # Correlate all normalised ICED matrices
-hicCorrelate --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
-             --outFileNameHeatmap "${dir}"/correlation_plots/${region}-"${binsize}"-heatmap.png \
-             --outFileNameScatter "${dir}"/correlation_plots/${region}-"${binsize}"-scatter.png \
-             --threads 6 --method pearson
+hicCorrelate \
+    --matrices "${dir}"/"${binsize}"/*-norm_iced.h5 \
+    --outFileNameHeatmap "${dir}"/correlation_plots/${region}-"${binsize}"-heatmap.png \
+    --outFileNameScatter "${dir}"/correlation_plots/${region}-"${binsize}"-scatter.png \
+    --threads 6 --method pearson
 
 for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
 
@@ -232,7 +234,7 @@ for ((i=0; i < ${#groups[@]}; i++)); do
         hicPlotMatrix --matrix "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.h5 \
             --outFileName "${dir}"/"${binsize}"/matrix_comparison/"${group1}"_vs_"${group2}"-"${region}"-"${binsize}"_log2.png \
             --colorMap bwr --region "${chr}":"${start}"-"${end}" --dpi 300 --vMin -3 --vMax 3 \
-            --title ${group1}_vs_${group2}-"${region}"_log2
+            --title "${group1}"_vs_"${group2}"-"${region}"_log2
 
         # Subtract tad insulation score from matrices between samples
         ~/phd/scripts/subtract-tads.py "${dir}"/"${binsize}"/tads/"${group1}"-"${region}"-"${binsize}"*tad_score.bm \
@@ -285,19 +287,19 @@ for matrix in "${dir}"/"${binsize}"/*-norm_?(sum_)iced.h5; do
     if [ -f "${loops_file}" ]; then
         hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${binsize}"/hic_plots/${matrix_rmpath/.h5}.png \
             --colorMap YlGn --log1p --region "${chr}":"${start}"-"${end}" --loops "${loops_file}" \
-            --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
+            --title "${matrix_rmpath/.h5}" --dpi 300 --vMin 1 --vMax ${vMax}
         hicPlotMatrix --matrix "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5 \
             --outFileName "${dir}"/"${binsize}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
             --colorMap YlGn --region "${chr}":"${start}"-"${end}" --loops "${loops_file}" \
-            --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
+            --title "${matrix_rmpath/.h5}"_obs_exp --dpi 300 --vMin 0 --vMax 2
     else
-        hicPlotMatrix --matrix ${matrix} --outFileName "${dir}"/"${binsize}"/hic_plots/${matrix_rmpath/.h5}.png \
+        hicPlotMatrix --matrix "${matrix}" --outFileName "${dir}"/"${binsize}"/hic_plots/"${matrix_rmpath/.h5}".png \
             --colorMap YlGn --log1p --region "${chr}":"${start}"-"${end}" \
-            --title ${matrix_rmpath/.h5} --dpi 300 --vMin 1 --vMax ${vMax}
-        hicPlotMatrix --matrix "${dir}"/"${binsize}"/${matrix_rmpath/.h5}_obs_exp.h5 \
-            --outFileName "${dir}"/"${binsize}"/hic_plots_obs_exp/${matrix_rmpath/.h5}_obs_exp.png \
+            --title "${matrix_rmpath/.h5}" --dpi 300 --vMin 1 --vMax "${vMax}"
+        hicPlotMatrix --matrix "${dir}"/"${binsize}"/"${matrix_rmpath/.h5}"_obs_exp.h5 \
+            --outFileName "${dir}"/"${binsize}"/hic_plots_obs_exp/"${matrix_rmpath/.h5}"_obs_exp.png \
             --colorMap YlGn --region "${chr}":"${start}"-"${end}" \
-            --title ${matrix_rmpath/.h5}_obs_exp --dpi 300 --vMin 0 --vMax 2
+            --title "${matrix_rmpath/.h5}"_obs_exp --dpi 300 --vMin 0 --vMax 2
     fi
 done
 
@@ -348,7 +350,6 @@ for transform in count obs_exp; do
         if [[ "${transform}" == "obs_exp" ]]; then
             sed -i "s/\.h5/_${transform}\.h5/g" "${plot_track}"
             sed -i 's/min_value = 1/min_value = 0/g' "${plot_track}"
-            #sed -i 's/#colormap/colormap/g' "${plot_track}"
             sed -i '/transform = log1p/d' "${plot_track}"
             sed -i "s/#max_value = none/max_value = 2/g" "${plot_track}"
         fi
