@@ -81,8 +81,8 @@ main() {
     # Run pyHiCTools
     while read -r forward_reads; read -r reverse_reads; do
         run_pyHiCTools \
-            -f "${forward_reads}" \
-            -r "${reverse_reads}" \
+            -1 "${forward_reads}" \
+            -2 "${reverse_reads}" \
             -x "${grch38_idx}" \
             -i "${digest}" \
             -s "${re_seq}" \
@@ -136,7 +136,6 @@ read_samples_from_file() {
 
 fail() {
     all_empty "${@}" || >&2 echo "${1}"
-    usage
     exit "${2-1}"
 }
 

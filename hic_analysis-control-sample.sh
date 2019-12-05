@@ -11,7 +11,7 @@ readonly top_dir=/media/stephen/Data/
 # Genome
 readonly build=GRCh38
 #readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
-readonly genome=/media/stephen/Data/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+readonly genome=/media/stephen/Data/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 # Genome index
 #readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
 readonly grch38_idx=/media/stephen/Data/genomes/index/GRCh38
@@ -46,7 +46,7 @@ main() {
     all_dirs "${top_dir}" || fail
 
     # Check provided input files are not empty.
-    all_files "${genome}" "${data_urls}" || fail
+    all_files "${genome}" "${raw_fastqs}" || fail
 
     # Create the necessary sub-directories.
     mkdir -p "${project_dir}" "${data_dir}" \
@@ -79,8 +79,8 @@ main() {
     # Run pyHiCTools
     while read -r forward_reads; read -r reverse_reads; do
         run_pyHiCTools \
-            -f "${forward_reads}" \
-            -r "${reverse_reads}" \
+            -1 "${forward_reads}" \
+            -2 "${reverse_reads}" \
             -x "${grch38_idx}" \
             -i "${digest}" \
             -s "${re_seq}" \
@@ -135,7 +135,6 @@ read_samples_from_file() {
 
 fail() {
     all_empty "${@}" || >&2 echo "${1}"
-    usage
     exit "${2-1}"
 }
 

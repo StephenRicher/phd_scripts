@@ -45,14 +45,15 @@ input_reads=( $(head -n "${line_num}" "${trimmed_fastqs}" | tail -n 2) )
 
 # Run pyHiCTools
 mpirun run_pyHiCTools \
-        -f "${input_reads[0]}" \
-        -r "${input_reads[1]}" \
+        -1 "${input_reads[0]}" \
+        -2 "${input_reads[1]}" \
         -x "${bt2_idx}" \
         -i "${digest}" \
         -s "${re_seq}" \
         -d "${data_dir}" \
         -q "${qc_dir}" \
         -j "${threads}" \
+        -f \
     >> "${processed_bams}"
 
 
