@@ -56,24 +56,16 @@ main() {
         && exit 1
 
     # Run truncation in parallel - USE GNU PARALLEL WHEN THIS IS INSTALLED ON CLUSTER
-    local i
-    local input
-    local output
-    for fastq in forward reverse; do
-        ((i=i%threads)); ((i++==0)) && wait
-        (
-        if [[ "${fastq}" == "forward ]]; then
-            input="${forward}"
-            output="${forward_trunc}"
-        else
-            input="${reverse}"
-            output="${reverse_trunc}"
-        pyHiCTools truncate --restriction "${restriction_seq}" -zu "${input}" \
-            > "${output}" \
-            2>> "${truncation_summary}"
-        ) &
-    done
-    wait
+    pyHiCTools truncate --restriction "${restriction_seq}" -zu "${forward}" \
+            > "${forward_trunc}" 2>> "${truncation_summary}" & \
+    pyHiCTools truncate --restriction "${restriction_seq}" -zu "${reverse}" \
+            > "${reverse_trunc}" 2>> "${truncation_summary}"
+
+    #export -f truncate
+    #parallel -j "${threads}"  --xapply \
+    #    truncate {1} {2} "${restriction_seq}" "${truncation_summary}" \
+    #    ::: "${forward}" "${reverse}" \
+    #    ::: "${forward_trunc}" "${reverse_trunc}"
 
     pyHiCTools map \
             --index "${bt2_idx}"  \
@@ -126,6 +118,18 @@ main() {
         2>> "${qc_dir}"/"${sample}"-filter_statistics.tsv
 
     echo "${hic_filtered}"
+}
+
+truncate() {
+    local file="${1}"
+    local output="${2}"
+    local restriction="${3}"
+    local summary="${4}"
+
+    pyHiCTools truncate \
+        --restriction "${restriction}" -zu "${file}" \
+        >> "${output}" \
+        2> "${summary}"
 }
 
 
