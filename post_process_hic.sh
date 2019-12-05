@@ -20,22 +20,18 @@ main() {
     done
     shift "$((OPTIND-1))"
 
-    if any_empty -n 3 "${input}" "${genome}" "${capture_regions}"; then
-       >&2 echo "Error: Missing mandatory arguments."
-        usage
-        exit 1
-    fi
+    any_empty -n 3 "${input}" "${genome}" "${capture_regions}" \
+        && fail "Error: Missing mandatory arguments."
 
-    if ! all_files "${input}" "${genome}" "${capture_regions}"; then
-        usage
-        exit 1
-    fi
+    all_files "${input}" "${genome}" "${capture_regions}" || fail
+
+    all_dirs "${data_dir}" || fail
 
     hcx_dir="${data_dir}"/hicexplorer
     diffhic_dir="${data_dir}"/diffhic
-    mkdir -p "${hcx_dir}" "${diffhic_dir}"
+    mkdir -p "${hcx_dir}" "${diffhic_dir}" || fail
 
-    local sample=$(get_sample "${input}") || exit 1
+    local sample=$(get_sample "${input}") || fail
 
     # Split input into R1 and R2 reads
     parallel -j "${threads}" --xapply \
@@ -168,7 +164,8 @@ join_by() {
 
 
 fail() {
-    >&2 echo "${1}"
+    all_empty "${@}" || >&2 echo "${1}"
+    usage
     exit "${2-1}"
 }
 
