@@ -40,16 +40,15 @@ readonly digest="${project_dir}"/"${build}"_"${re_name}"-digest.txt.gz
 main() {
 
     # Check top level directory exists.
-    is_dir "${top_dir}" \
-        || fail "Error: "${top_dir}" is not a directory."
+    all_dirs "${top_dir}" || fail
 
     # Check provided input files are not empty.
-    ! all_files "${genome}" "${data_urls}" && exit 1
+    all_files "${genome}" "${data_urls}" || fail
 
     # Create the necessary sub-directories.
     mkdir -p "${project_dir}" "${data_dir}" \
              "${qc_dir}" "${paths_dir}" \
-        || exit 1
+        || fail
 
     # Create copy of data ULRS in project folder.
     cp "${data_urls}" "${paths_dir}"
@@ -89,7 +88,8 @@ main() {
             -s "${re_seq}" \
             -d "${data_dir}" \
             -q "${qc_dir}" \
-            -j "${threads}"
+            -j "${threads}" \
+            -f
     done < "${trimmed_fastqs}" > "${processed_bams}"
 
     /home/stephen/phd/scripts/figures/plot_filter.R \
@@ -135,7 +135,8 @@ read_samples_from_file() {
 }
 
 fail() {
-    >&2 echo "${1}"
+    all_empty "${@}" || >&2 echo "${1}"
+    usage
     exit "${2-1}"
 }
 
