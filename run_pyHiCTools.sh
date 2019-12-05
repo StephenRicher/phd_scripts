@@ -46,21 +46,30 @@ main() {
     hic_filtered="${data_dir}"/"${sample}".filt.bam
     hic_extract="${data_dir}"/"${sample}".extracted-subsample.txt
     truncation_summary="${qc_dir}"/"${sample}"-truncation_summary.txt
+    forward_trunc=$(modify_path -d "${data_dir}" -a '-trunc' "${forward}")
+    reverse_trunc=$(modify_path -d "${data_dir}" -a '-trunc' "${reverse}")
 
     # Check if any output files already exist.
     any_files "${intermediate}" "${hic_stats}" "${hic_processed}" \
               "${hic_filtered}" "${truncation_summary}" "${hic_extract}" \
+              "${forward_trunc}" "${reverse_trunc}" \
         && exit 1
 
-    # Run truncation in parallel
+    # Run truncation in parallel - USE GNU PARALLEL WHEN THIS IS INSTALLED ON CLUSTER
     local i
-    for fastq in "${forward}" "${reverse}"; do
+    local input
+    local output
+    for fastq in forward reverse; do
         ((i=i%threads)); ((i++==0)) && wait
         (
-        truncated_fastq=$(modify_path -d "${data_dir}" -a '-trunc' "${fastq}")
-        any_files "${truncated_fastq}" && exit 1
-        pyHiCTools truncate --restriction "${restriction_seq}" -zu "${fastq}" \
-            > "${truncated_fastq}" \
+        if [[ "${fastq}" == "forward ]]; then
+            input="${forward}"
+            output="${forward_trunc}"
+        else
+            input="${reverse}"
+            output="${reverse_trunc}"
+        pyHiCTools truncate --restriction "${restriction_seq}" -zu "${input}" \
+            > "${output}" \
             2>> "${truncation_summary}"
         ) &
     done
