@@ -83,12 +83,12 @@ main() {
         > "${hic_processed}"
 
     total_pairs=$(grep -m 1 'reads; of these:' "${qc_dir}"/"${sample}".alignment_stats.txt | awk '{print $1}')
-    both_pair_unmapped=$(samtools view -cf 12 "${intermediate}")
-    r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 "${intermediate}")
-    r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 "${intermediate}")
+    both_pair_unmapped=$(samtools view -c f 12 -@ "${threads}" "${intermediate}")
+    r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 -@ "${threads}" "${intermediate}")
+    r2_map_r1_unmap=$(samtools view -c -f 136 -F 4 -@ "${threads}" "${intermediate}")
     unmapped_pairs=$(( both_pair_unmapped + r1_map_r2_ummap + r2_map_r1_unmap ))
     duplicate_pairs=$(grep -m 1 'DUPLICATE' "${qc_dir}"/"${sample}".dedup_stats.txt | awk '{print $3}')
-    total_kept_pairs=$(samtools view -cf 64 "${hic_processed}")
+    total_kept_pairs=$(samtools view -c f 64 -@ "${threads}" "${hic_processed}")
     qual_filtered_pairs=$(( total_pairs - total_kept_pairs - duplicate_pairs - unmapped_pairs ))
 
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -100,7 +100,7 @@ main() {
         "${duplicate_pairs}" "${qual_filtered_pairs}" \
         "${total_kept_pairs}" > "${hic_stats}"
 
-    samtools view -hs 42.05 "${hic_processed}" \
+    samtools view -h s 42.05 -@ "${threads}" "${hic_processed}" \
         | pyHiCTools extract \
             --sample "${sample}" \
             --log "${qc_dir}"/"${sample}".extract.logfile \
