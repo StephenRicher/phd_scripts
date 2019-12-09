@@ -37,6 +37,7 @@ while IFS=$'\t' read -r chr start end region; do
                 -c "${chr}" \
                 -s "${start}" \
                 -e "${end}" \
+                -n "${sample}" \
                 -r "${region}" \
                 -d "${data_dir}" \
                 -j "${threads}"

@@ -4,16 +4,18 @@ main() {
     local vcf
     local start
     local end
+    local sample
     local region
     local data_dir="."
     local threads=1
 
-    while getopts 'v:c:s:e:r:d:j:' flag; do
+    while getopts 'v:c:s:e:n:r:d:j:' flag; do
         case "${flag}" in
             v) vcf="${OPTARG}" ;;
             c) chr="${OPTARG}" ;;
             s) start="${OPTARG}" ;;
             e) end="${OPTARG}" ;;
+            n) sample="${OPTARG}" ;;
             r) region="${OPTARG}" ;;
             d) data_dir="${OPTARG}" ;;
             j) threads="${OPTARG}" ;;
@@ -22,7 +24,8 @@ main() {
         esac
     done
 
-    if any_empty -n 5 "${vcf}" "${chr}" "${start}" "${end}" "${region}"; then
+    if any_empty -n 6 "${vcf}" "${chr}" "${start}" \
+                      "${end}" "${region}" "${sample}"; then
        >&2 echo "Error: Missing mandatory arguments."
         usage
         exit 1
@@ -33,11 +36,9 @@ main() {
         exit 1
     fi
 
-    local sample=$(get_sample "${vcf}") || exit 1
-
     bcftools view \
             --output-type v \
-            --regions "${chr}":$(("${start}"+1))-"${end}" \
+            --regions "${chr}":$((${start}+1))-"${end}" \
             "${vcf}" \
         > "${data_dir}"/"${sample}"_"${region}".vcf
     java -Xmx100g -jar "${hapcompass}" \
