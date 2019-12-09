@@ -2,7 +2,7 @@
 
 #SBATCH --account=free
 #SBATCH --array=1-63
-#SBATCH --job-name=call_variants_%A_%a
+#SBATCH --job-name=run_hapcompass_%A_%a
 #SBATCH --output=/home/u/sr467/scratch/projects/hic-01/qc/run_hapcompass_%A_%a.out
 #SBATCH --error=/home/u/sr467/scratch/projects/hic-1/qc/run_hapcompass_%A_%a.err
 #SBATCH --partition=batch-128gb
