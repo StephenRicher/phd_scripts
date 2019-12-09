@@ -8,7 +8,7 @@
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=24:00:00
+#SBATCH --time=5:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=sr467@bath.ac.uk
 
