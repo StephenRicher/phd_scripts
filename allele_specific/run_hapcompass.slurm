@@ -32,7 +32,7 @@ count=1
 while IFS=$'\t' read -r chr start end region; do
     for sample in "${samples[@]}"; do
         if [[ "${count}" == "${SLURM_ARRAY_TASK_ID}" ]]; then
-            mpirun ./run_hapcompass.sh \
+            mpirun run_hapcompass \
                 -v "${data_dir}"/"${sample}".sorted.vcf.gz \
                 -c "${chr}" \
                 -s "${start}" \
