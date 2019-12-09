@@ -4,7 +4,7 @@
 #SBATCH --array=1-3
 #SBATCH --job-name=call_variants_%A_%a
 #SBATCH --output=/home/u/sr467/scratch/projects/hic-01/qc/call_variants_%A_%a.out
-#SBATCH --error=/home/u/sr467/scratch/projects/hic-1/qc/call_variants_%A_%a.err
+#SBATCH --error=/home/u/sr467/scratch/projects/hic-01/qc/call_variants_%A_%a.err
 #SBATCH --partition=batch
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
