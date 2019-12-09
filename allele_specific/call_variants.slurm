@@ -41,7 +41,7 @@ data_dir="/home/u/sr467/scratch/projects/hic-01/allele_specific"
 threads="${SLURM_CPUS_PER_TASK}"
 
 # Run call_variants script
-mpirun call_variants \
+mpirun ./call_variants.sh \
     -g "${genome}" \
     -c "${capture_regions}" \
     -d "${data_dir}" \
