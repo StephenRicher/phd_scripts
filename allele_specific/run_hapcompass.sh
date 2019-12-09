@@ -28,7 +28,7 @@ main() {
         exit 1
     fi
 
-    if ! all_files "${vcf}"; then
+    if ! all_files "${vcf}" "${vcf}".csi; then
         usage
         exit 1
     fi
