@@ -37,6 +37,7 @@ readonly paths_dir="${project_dir}"/paths/
 
 # Files
 readonly trimmed_fastqs="${paths_dir}"/trimmed_fastqs.txt
+readonly filtered_bams="${paths_dir}"/hic-filtered_bams.txt
 readonly processed_bams="${paths_dir}"/hic-processed_bams.txt
 readonly digest="${project_dir}"/"${build}"_"${re_name}"-digest.txt.gz
 
@@ -88,12 +89,18 @@ main() {
             -q "${qc_dir}" \
             -j "${threads}" \
             -f
-    done < "${trimmed_fastqs}" > "${processed_bams}"
+    done < "${trimmed_fastqs}" > "${filtered_bams}"
 
     /home/stephen/phd/scripts/figures/plot_filter.R \
         <(cat "${data_dir}"/*.extracted-subsample.txt \
             | sed '2,${/sample\torientation/d;}') \
         "${qc_dir}"
+
+    export -f filter
+    parallel -j "${threads}" \
+        filter {1} "${data_dir}" "${qc_dir}" \
+        ::::  "${filtered_bams}" \
+        >> "${processed_bams}"
 
     while read -r bam; do
         post_process_hic \
@@ -105,6 +112,8 @@ main() {
     done < "${processed_bams}" \
         | sed '2,${/sample\tcapture_region/d;}' \
         > "${qc_dir}"/all_samples_summary.txt
+
+    # ADD CUSTOM GENOME CREATION BY CAPTURE REGION!
 
     # Extract all samples names from processed bams file
     samples=( $(read_samples_from_file "${processed_bams}") )
@@ -122,6 +131,27 @@ main() {
                 "${samples[@]}"
         done
     done < "${capture_regions}"
+}
+
+
+filter() {
+    local file="${1}"
+    local data_dir="${2}"
+    local qc_dir="${3}"
+
+    local sample=$(get_sample "${file}")
+    local output="${data_dir}"/"${sample}".filt.bam
+
+    pyHiCTools filter \
+        --min_ditag 100 --max_ditag 1000 \
+        --min_inward 1000 \
+        --log "${qc_dir}"/"${sample}".filter.logfile \
+        --sample "${sample}" \
+        "${file}" \
+        > "${data_dir}"/"${sample}".filt.bam \
+        2> "${qc_dir}"/"${sample}"-filter_statistics.tsv
+
+    echo "${output}"
 }
 
 
