@@ -106,16 +106,7 @@ main() {
             --log "${qc_dir}"/"${sample}".extract.logfile \
         >> "${hic_extract}"
 
-    pyHiCTools filter \
-        --min_ditag 100 --max_ditag 1000 \
-        --min_inward 1000 \
-        --log "${qc_dir}"/"${sample}".filter.logfile \
-        --sample "${sample}" \
-        "${hic_processed}" \
-        > "${hic_filtered}" \
-        2>> "${qc_dir}"/"${sample}"-filter_statistics.tsv
-
-    echo "${hic_filtered}"
+    echo "${hic_processed}"
 }
 
 truncate() {
