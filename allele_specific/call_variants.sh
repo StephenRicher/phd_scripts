@@ -34,7 +34,9 @@ main() {
         exit 1
     fi
 
-    local sample=$(get_sample "${input_bams[1]}") || exit 1
+    local sample=$(get_sample "${input_bams[0]}") || exit 1
+    # Remove replicate number
+    sample="${sample/-*/}"
 
     # Merge coordinate sorted replicates and index
     samtools merge -@ "${threads}" - "${input_bams[@]}" \
