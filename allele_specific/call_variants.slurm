@@ -26,9 +26,9 @@ samples=( 'HB2_CL4' 'HB2_WT' 'MCF7' )
 processed_bams="/home/u/sr467/scratch/projects/hic-01/paths/hic-processed_bams.txt"
 
 # Get sample-specific BAMs from processed BAMS file
-index=$(("${SLURM_ARRAY_TASK_ID}"-1))
+index=$((${SLURM_ARRAY_TASK_ID}-1))
 sample="${samples["${index}"]}"
-input_bams=( $(grep "${sample}" "${process_bams}") )
+input_bams=( $(grep "${sample}" "${processed_bams}") )
 
 # Reference genome (unmasked) that processed BAMs were mapped to.
 genome="/home/u/sr467/scratch/projects/genomes/GRCh38/wgs/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
