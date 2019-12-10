@@ -59,11 +59,11 @@ main() {
     # Extract top scoring block from MWER solution
     awk -v n="${top_score_line}" '
             NR<n {next} NR==n {print;next} /^BLOCK/ {exit} {print}' \
-        "${file}" \
+        "${MWER}" \
         > "${MWER_top}"
 
     # Convert solution to VCF for genome masking
-    java -jar "${hc2vcf}" "${MWER_top}" <(zcat "${vcf_out}") 2 true
+    java -jar "${hc2vcf}" "${MWER_top}" <(zcat "${vcf}") 2 true
 
     # Convert VCF to SNPsplit friendly output
     awk -v OFS=$'\t' '
