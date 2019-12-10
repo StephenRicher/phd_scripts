@@ -18,6 +18,8 @@ ctcf_seq_revcomp=$'>ctcf\nCTGCCACCTNGTGG'
 
 for file in "${@}"; do
     while IFS= read -r line; do
+
+        # Skip header
         if [[ "${line}" == "#"* ]]; then
             continue
         fi
@@ -27,8 +29,6 @@ for file in "${@}"; do
 
         declare -a alignments
         declare -a scores
-
-
 
         # Run alignment for forward and reverse sequence and save output.
         for sequence in "${ctcf_seq}" "${ctcf_seq_revcomp}"; do
@@ -68,11 +68,12 @@ for file in "${@}"; do
         # Print each sequence character on its own line.
         # Get positions (line number) of sequence characters (not '-')
         # Extract start and end by sorting.
-        ctcf_positions=$(echo "${alignment}" | grep 'ctcf ' \
-        | awk -v ORS='' '{print $3}' \
-        | sed 's/./\0\n/g' \
-        | grep -nv '-' \
-        | cut -d ':' -f 1)
+        ctcf_positions=$(echo "${alignment}" \
+                            | grep 'ctcf ' \
+                            | awk -v ORS='' '{print $3}'  \
+                            | sed 's/./\0\n/g' \
+                            | grep -nv '-' \
+                            | cut -d ':' -f 1)
         ctcf_start=$(echo "${ctcf_positions}" | sort -n | head -n 1)
         ctcf_end=$(echo "${ctcf_positions}" | sort -rn | head -n 1)
 
@@ -87,7 +88,6 @@ for file in "${@}"; do
         unset scores
         unset alignments
 
-        # Sort by column 1, then numeric sort by column 2
         echo "${line}" \
         | awk -v OFS='\t' -v direction="${direction}" \
               -v start="${abs_ctcf_start}" -v end="${abs_ctcf_end}" '
