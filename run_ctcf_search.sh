@@ -10,6 +10,6 @@ done
 
 # Merge CTCF replicates
 cat "${dir}"/MCF-7_CTCF_*.bed \
-| bedtools sort \
-| bedtools merge -s -c 4,5,6 -o count,median,distinct \
-> "${dir}"/MCF-7_CTCF-merged.bed
+    | bedtools sort \
+    | bedtools merge -s -c 4,5,6 -o count,median,distinct \
+    > "${dir}"/MCF-7_CTCF-merged.bed
