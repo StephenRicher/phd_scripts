@@ -10,11 +10,12 @@ main() {
 
         for file in "${sample}"*MWER*solution*vcf; do
             bcftools view -O z "${file}" > "${file}".gz
-            bcftools index "${file}".gz
+            #bcftools index "${file}".gz
         done
 
-        bcftools concat --allow-overlaps  \
+        bcftools concat --naive  \
                 "${data_dir}"/"${sample}"*MWER*solution*vcf.gz \
+            | bcftools view \
             > "${data_dir}"/"${sample}"-MWER_solution_all.vcf
 
     done
