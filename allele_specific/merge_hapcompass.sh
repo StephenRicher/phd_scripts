@@ -13,7 +13,9 @@ main() {
             bcftools index "${file}".gz
         done
 
-        bcftools concat "${data_dir}"/"${sample}"*MWER*solution*vcf.gz
+        bcftools concat --allow-overlaps  \
+                "${data_dir}"/"${sample}"*MWER*solution*vcf.gz \
+            > "${data_dir}"/"${sample}"-MWER_solution_all.vcf
 
     done
 
