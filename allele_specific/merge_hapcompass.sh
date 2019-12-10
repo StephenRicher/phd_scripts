@@ -8,18 +8,11 @@ main() {
         cat "${data_dir}"/"${sample}"*snpsplit* \
             > "${data_dir}"/"${sample}"_all_MWER_solution_snpsplit.txt
 
-        for file in "${sample}"*MWER*solution*vcf; do
-            bcftools view -O z "${file}" > "${file}".gz
-            #bcftools index "${file}".gz
-        done
-
         bcftools concat --naive  \
                 "${data_dir}"/"${sample}"*MWER*solution*vcf.gz \
             | bcftools view \
             > "${data_dir}"/"${sample}"-MWER_solution_all.vcf
-
     done
-
 }
 
 main
