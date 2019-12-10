@@ -8,12 +8,11 @@ main() {
         cat "${data_dir}"/"${sample}"*snpsplit* \
             > "${data_dir}"/"${sample}"_all_MWER_solution_snpsplit.txt
 
-        for file in MCF7*MWER*vcf; do
+        for file in "${sample}"*MWER*solution*vcf; do
             bcftools sort -O v "$file}" \
                 > "${file/solution/sorted}"
             bcftools index "${file/solution/sorted}"
         done
-
 
         #bcftools "${data_dir}"/"${sample}"-*-MWER.sorted.vcf
 
