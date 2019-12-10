@@ -9,12 +9,11 @@ main() {
             > "${data_dir}"/"${sample}"_all_MWER_solution_snpsplit.txt
 
         for file in "${sample}"*MWER*solution*vcf; do
-            bcftools sort -O v "$file}" \
-                > "${file/solution/sorted}"
-            bcftools index "${file/solution/sorted}"
+            bcftools view -O z "${file}" > "${file}".gz
+            bcftools index "${file}".gz
         done
 
-        #bcftools "${data_dir}"/"${sample}"-*-MWER.sorted.vcf
+        bcftools concat "${data_dir}"/"${sample}"*MWER*solution*vcf.gz
 
     done
 
