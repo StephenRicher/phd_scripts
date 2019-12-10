@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 main() {
+    local sample
     local samples=( 'HB2_CL4' 'HB2_WT' 'MCF7' )
-    data_dir="/home/u/sr467/scratch/projects/hic-01/allele_specific"
+    local data_dir="/home/u/sr467/scratch/projects/hic-01/allele_specific"
 
     for sample in "${samples[@]}"; do
         cat "${data_dir}"/"${sample}"*snpsplit* \
