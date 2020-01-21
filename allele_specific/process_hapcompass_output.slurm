@@ -17,6 +17,8 @@ module load slurm
 module load openmpi/intel
 module load java/jdk/1.8.0
 
+### ARCHIVED VERSION DELETE THIS ####
+
 # Excluding replicate number
 samples=( 'HB2_CL4' 'HB2_WT' 'MCF7' )
 
