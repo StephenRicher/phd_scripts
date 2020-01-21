@@ -21,7 +21,7 @@ main() {
             d) data_dir="${OPTARG%/}" ;;
             q) qc_dir="${OPTARG%/}" ;;
             j) threads="${OPTARG}" ;;
-            f) local keep_files="false" ;;
+            f) local remove="TRUE" ;;
             *) usage ;;
         esac
     done
@@ -51,7 +51,7 @@ main() {
     any_files "${intermediate}" "${hic_stats}" "${hic_processed}" \
               "${hic_filtered}" "${truncation_summary}" "${hic_extract}" \
               "${forward_trunc}" "${reverse_trunc}" \
-        && retain "${keep_files}" && fail
+        && (overwrite "${remove}" || echo fail)
 
     # Run truncation in parallel - USE GNU PARALLEL WHEN THIS IS INSTALLED ON CLUSTER
     pyHiCTools truncate --restriction "${restriction_seq}" -zu "${forward}" \
@@ -82,6 +82,7 @@ main() {
             --log "${qc_dir}"/"${sample}".process.logfile \
         > "${hic_processed}"
 
+    # This (up to and including printf statement) is included in the generate_processing_stats.sh file
     total_pairs=$(grep -m 1 'reads; of these:' "${qc_dir}"/"${sample}".alignment_stats.txt | awk '{print $1}')
     both_pair_unmapped=$(samtools view -c -f 12 -@ "${threads}" "${intermediate}")
     r1_map_r2_unmap=$(samtools view -c -f 72 -F 4 -@ "${threads}" "${intermediate}")
