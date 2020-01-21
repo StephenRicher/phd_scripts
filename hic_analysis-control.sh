@@ -22,7 +22,6 @@ readonly data_urls=data_urls.txt
 # Define threads
 threads=12
 
-
 #########################################################################
 
 # Directories
@@ -114,6 +113,9 @@ main() {
     done < "${processed_bams}" \
         | sed '2,${/sample\tcapture_region/d;}' \
         > "${qc_dir}"/all_samples_summary.txt
+
+    # Format for latex usage
+    format-hicexplorer_summary "${qc_dir}"/all_samples_summary.txt
 
     # ADD CUSTOM GENOME CREATION BY CAPTURE REGION!
 
