@@ -6,25 +6,25 @@
 
 readonly project_name=hic_01-subsample
 # Directory to store project folder.
-#readonly top_dir=/home/stephen/x_db/DBuck/s_richer/
-readonly top_dir=/media/stephen/Data/
+readonly top_dir=/home/stephen/x_db/DBuck/s_richer/
+#readonly top_dir=/media/stephen/Data/
 # Genome
 readonly build=GRCh38
-#readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
-readonly genome=/media/stephen/Data/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+readonly genome=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+#readonly genome=/media/stephen/Data/genomes/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 # Genome index
-#readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
-readonly grch38_idx=/media/stephen/Data/genomes/index/GRCh38
+readonly grch38_idx=/home/stephen/x_db/DBuck/s_richer/genomes/GRCh38/bt2_index/GRCh38
+#readonly grch38_idx=/media/stephen/Data/genomes/index/GRCh38
 # Define restriction enzyme cut sequence
 readonly re_name=Mbo1
 readonly re_seq='^GATC'
 # Define capture regions
 readonly capture_regions=/home/stephen/phd/scripts/capture_regions.bed
 # Path to data paths
-#readonly raw_fastqs=/home/stephen/x_db/DBuck/s_richer/hic_01-subsample/paths/raw_fastqs.txt
-readonly raw_fastqs=/media/stephen/Data/hic_01-subsample/paths/raw_fastqs.txt
+readonly raw_fastqs=/home/stephen/x_db/DBuck/s_richer/hic_01-subsample/paths/raw_fastqs.txt
+#readonly raw_fastqs=/media/stephen/Data/hic_01-subsample/paths/raw_fastqs.txt
 # Define threads
-threads=6
+threads=2
 
 
 #########################################################################
@@ -36,6 +36,7 @@ readonly qc_dir="${project_dir}"/qc
 readonly paths_dir="${project_dir}"/paths/
 
 # Files
+readonly dedup_fastqs="${paths_dir}"/dedup_fastqs.txt
 readonly trimmed_fastqs="${paths_dir}"/trimmed_fastqs.txt
 readonly filtered_bams="${paths_dir}"/hic-filtered_bams.txt
 readonly processed_bams="${paths_dir}"/hic-processed_bams.txt
@@ -62,10 +63,22 @@ main() {
     fastq_screen --aligner bowtie2 --threads "${threads}" \
         --outdir "${qc_dir}" $(< "${raw_fastqs}")
 
+    while read -r forward; read -r reverse; do
+        local out_r1=$(modify_path -a -dedup "${forward}")
+        local out_r2=$(modify_path -a -dedup "${reverse}")
+        ~/phd/fastqTools/run_fastqc.sh \
+        -d "${qc_dir}"/fastqc/ \
+        -j "${threads}" \
+        -1 "${out_r1}" \
+        -2 "${out_r2}" \
+        "${forward}" "${reverse}"
+        printf "%s\n%s\n" "${out_r1}" "${out_r2}"
+    done < "${raw_fastqs}" > "${dedup_fastqs}"
+
     # Execute cutadapt
     local forward_adapter=AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
     local reverse_adapter=AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
-    run_paired_cutadapt -i "${raw_fastqs}" -d "${data_dir}" \
+    run_paired_cutadapt -i "${dedup_fastqs}" -d "${data_dir}" \
         -q "${qc_dir}" -j "${threads}" -- \
         -a "${forward_adapter}" -A "${reverse_adapter}" \
         --error-rate 0.1 --overlap 1 --gc-content 46 \
@@ -113,7 +126,15 @@ main() {
         | sed '2,${/sample\tcapture_region/d;}' \
         > "${qc_dir}"/all_samples_summary.txt
 
-    # ADD CUSTOM GENOME CREATION BY CAPTURE REGION!
+    # Format for latex usage
+    format-hicexplorer_summary "${qc_dir}"/all_samples_summary.txt
+
+    # Create custom genome and rename FASTA header to region name.
+    custom_genome="${project_dir}"/"${genome##*/}".captured_regions.fa
+    while IFS=$'\t' read -r chr start end region; do
+        samtools faidx "${genome}" "${chr}":$((start+1))-"${end}" \
+            | sed "1 s/^.*$/>${region}/"
+    done < "${capture_regions}" > "${custom_genome}"
 
     # Extract all samples names from processed bams file
     samples=( $(read_samples_from_file "${processed_bams}") )
